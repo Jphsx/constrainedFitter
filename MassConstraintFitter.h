@@ -160,9 +160,13 @@ private:
 
   //global fitobject pointers
   //return Fit objects in the fitter is not retaining the derived class and chopping to base class
-  JetFitObject* gammaJet;
-  LeptonFitObject* part1;
-  LeptonFitObject* part2; 
+ 
+// JetFitObject* gammaJet;
+  std::vector<JetFitObject*> neutralJets;
+
+  //LeptonFitObject* part1;
+ // LeptonFitObject* part2;
+  std::vector<LeptonFitObject*> chargedFO; 
 //  OPALFitterGSL* fitter;
     BaseFitter* ftest;
 

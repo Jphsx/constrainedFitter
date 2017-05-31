@@ -707,53 +707,99 @@ FloatVec MassConstraintFitter::ConstructCovMatrix(TLorentzVector p1, TLorentzVec
 //===================================================================================
 //Current implementation only allows one type of fitter because using the base class is not working correctly
 //BaseFitter* MassConstraintFitter::setUpFit(TLorentzVector gamma, TLorentzVector p1, TLorentzVector p2, Track* p1Track, Track* p2Track ){
-OPALFitterGSL* MassConstraintFitter::setUpFit(TLorentzVector gamma, TLorentzVector p1, TLorentzVector p2, Track* p1Track, Track* p2Track){
+//OPALFitterGSL* MassConstraintFitter::setUpFit(TLorentzVector gamma, TLorentzVector p1, TLorentzVector p2, Track* p1Track, Track* p2Track){
+BaseFitter* MassConsraintFitter::setUpFit(vector<int> neutralIndices, vector<int> chargedIndices,
+					vector<TLorentzVector> pneutral, vector<TLorentzVector> ptrack,
+					vector<ReconstructedParticle*> pNeutralVec, vector<Track*> pTrackVec){                                       
 
 	//set up mass constraint
-	MassConstraint mc( (double)_resonanceMass );
+	MassConstraint mc( (double)_parentMass );
 
 	//construct fit objects for gamma, and 2 charged particles
-	std::vector<double> PhotonErrors = getPhotonErrors(gamma);
-//	JetFitObject*	
-	 gammaJet = new JetFitObject(gamma.E(), gamma.Theta(), gamma.Phi(), PhotonErrors[0], PhotonErrors[1], PhotonErrors[2]);
-	gammaJet->setName("Photon");					
+	//std::vector<double> PhotonErrors = getPhotonErrors(gamma);
+	std::vector<std::vector<double> > neutralErrors;// = getNeutralErrors( ?)
+	std::vector<std::vector<double> > chargedErrors;
 
-	std::vector<double> P1Errors = getChargedParticleErrors(p1,p1Track);
+	for(unsigned int i =0; i< neutralIndices.size(); i++){
+		neutralErrors.push_back(getNeutralErrors(pNeutralVec.at( neutralIndices.at(i)) ) );//should i pass recopart or tlv here?
+	}
+	for(unsigned int i=0; i < chargedIndices.size(); i++){
+		chargedErrors.push_back(getChargedErrors(pTracVec.at( chargedIndices.at(i)) ) );
+	}
+
+//	JetFitObject*	
+	// gammaJet = new JetFitObject(gamma.E(), gamma.Theta(), gamma.Phi(), PhotonErrors[0], PhotonErrors[1], PhotonErrors[2]);
+//	gammaJet->setName("Photon");
+
+	//set up JetFitObjects
+	for(unsigned int i=0; i < neutralIndices.size(); i++){
+		neutralJets.push_back( new JetFitObject(pneutral.at(neutralIndices.at(i)).E(),pneutral.at(neutralIndices.at(i)).Theta(),pneutral.at(neutralIndices.at(i)).Phi(), neutralErrors.at(i)[0], neutralErrors.at(i)[1], neutralErrors.at(i)[2]));
+	}					
+
+	//std::vector<double> P1Errors = getChargedParticleErrors(p1,p1Track);
 //	LeptonFitObject* 
-	part1 = new LeptonFitObject(1/p1.Perp(),p1.Theta(),p1.Phi(),P1Errors[0],P1Errors[1],P1Errors[2],_daughterDecayMass);
-	part1->setName("Particle+");
+	//part1 = new LeptonFitObject(1/p1.Perp(),p1.Theta(),p1.Phi(),P1Errors[0],P1Errors[1],P1Errors[2],_daughterDecayMass);
+	//part1->setName("Particle+");
 					
-	std::vector<double> P2Errors = getChargedParticleErrors(p2,p2Track);
+	//std::vector<double> P2Errors = getChargedParticleErrors(p2,p2Track);
 //	LeptonFitObject* 
-	part2 = new LeptonFitObject(1/p2.Perp(),p2.Theta(),p2.Phi(),P2Errors[0],P2Errors[1],P2Errors[2],_daughterDecayMass);
-	part2->setName("Particle-");
-	if(_printing>4)std::cout <<" Measured Quantities" <<std::endl;						
-	if(_printing>4)std::cout <<" Track1 particle (k,theta,phi): " << 1/p1.Perp() << " " << p1.Theta() << " " << p1.Phi() << std::endl;
+	//part2 = new LeptonFitObject(1/p2.Perp(),p2.Theta(),p2.Phi(),P2Errors[0],P2Errors[1],P2Errors[2],_daughterDecayMass);
+	//part2->setName("Particle-");
+	
+	for(unsigned int i =0; i < chargedIndices.size(); i++){
+		chargedFO.push_back( new LeptonFitObject( 1/ptrack.at(chargedIndices.at(i)).Perp(), ptrack.at(chargedIndices.at(i)).Theta(), ptrack.at(chargedIndices.at(i)).Phi(), chargedErrors.at(i)[0], chargedErrors.at(i)[1], chargedErrors.at(i)[2]), ptrack.at(chargedIndices.at(i)).M());
+	} 	
+
+
+	if(_printing>4)std::cout <<" Fitting Measured Quantities:" <<std::endl;						
+	/*if(_printing>4)std::cout <<" Track1 particle (k,theta,phi): " << 1/p1.Perp() << " " << p1.Theta() << " " << p1.Phi() << std::endl;
         if(_printing>4)std::cout <<" Errors (dk, dtheta, dphi): " << P1Errors[0]<< " " << P1Errors[1] << " " <<P1Errors[2] <<std::endl;				
 	if(_printing>4)std::cout <<" Track2 particle (k,theta,phi): " << 1/p2.Perp() << " " << p2.Theta() << " " << p2.Phi() << std::endl;
         if(_printing>4)std::cout <<" Errors (dk,dtheta,dphi): " << P2Errors[0]<< " " << P2Errors[1] << " " << P2Errors[2] << std::endl;
 	if(_printing>4)std::cout <<" Photon (E,theta,phi): " << gamma.E() << " " << gamma.Theta() << " " << gamma.Phi() << std::endl;
-	if(_printing>4)std::cout <<" Errors (dE,dtheta,dphi): " << PhotonErrors[0] << " " << PhotonErrors[1] << " " << PhotonErrors[2] << std::endl;
+	if(_printing>4)std::cout <<" Errors (dE,dtheta,dphi): " << PhotonErrors[0] << " " << PhotonErrors[1] << " " << PhotonErrors[2] << std::endl;*/
+	if(_printing>4)std::cout <<" Neutral Particles "<<std::endl;
+	for(unsigned int i =0; i< neutralIndices.size(); i++){
+		if(_printing>4)std::cout << "neutral "<< i <<" E, theta, phi, M, Pdg: " <<  pneutral.at(neutralIndices.at(i)).E()<< " "<< pneutral.at(neutralIndices.at(i)).Theta()<< " "<< pneutral.at(neutralIndices.at(i)).Phi()<< " "<< pneutral.at(neutralIndices.at(i)).M()<< " "<< pNeutralVec.at(neutralIndices.at(i))->getType() << std::endl;
+		if(_printing>4)std::cout << "errors "<< i <<" dE, dTheta, dPhi: " << neutralErrors.at(i)[0] << " "<< neutralErrors.at(i)[1] << " "<<neutralErrors.at(i)[2]<< std::endl;
+	}	
+	for(unsigned int i=0; i< chargedIndices.size(); i++){
+		if(_printing>4)std::cout <<"charged "<< i <<" k, theta, phi, M: " << 1/ptrack.at(chargedIndices.at(i)).Perp()<< " "<< ptrack.at(chargedIndices.at(i)).Theta()<<" "<< ptrack.at(chargedIndices.at(i)).Phi()<<" "<<ptrack.at(chargedIndices.at(i)).M() << std::endl;
+	}
+
 
 	//clean up memory with errors that are not going to be used again in this scope
-	 PhotonErrors.clear();
-	 P1Errors.clear();
-	 P2Errors.clear();
+	// PhotonErrors.clear();
+	// P1Errors.clear();
+	// P2Errors.clear();
+	neutralErrors.clear();
+	chargedErrors.clear();
 					
 	//add fitobjects to mass constraint
 //	mc.addToFOList(*gammaJet);
-        mc.addToFOList(*part1);
-	mc.addToFOList(*part2);
-	mc.addToFOList(*gammaJet);
+      //  mc.addToFOList(*part1);//
+//	mc.addToFOList(*part2);
+//	mc.addToFOList(*gammaJet);
+	for(unsigned int i =0; i<neutralIndices.size(); i++){
+		mc.addtoFOList(*neutralJets[i]);
+	}
+	for(unsigned int i= 0; i<chargedIndices.size(); i++){
+		mc.addtoFOList(*chargedFO[i]);
+	}
 
 	//declare fitter
+	//include options for other fitters
 	OPALFitterGSL * fitter = new OPALFitterGSL();
-	
+	///////////////////	
+
 	//add constraints and fit objects to fitter
 //	fitter->addFitObject(gammaJet);
-	fitter->addFitObject(part1);
-	fitter->addFitObject(part2);
-	fitter->addFitObject(gammaJet);
+	//fitter->addFitObject(part1);
+	//fitter->addFitObject(part2);
+	//fitter->addFitObject(gammaJet);
+	for(unsigned int i=
+
+	//add the things, what order should i use? charged then neutral?
 	fitter->addConstraint(mc);
 	
 	//do the fit (this also returns a fit probability)
@@ -766,7 +812,7 @@ OPALFitterGSL* MassConstraintFitter::setUpFit(TLorentzVector gamma, TLorentzVect
 	return fitter;
 
 }
-void generateSubsets(std::vector<int> v, int k, int start, int currLen, std::vector<bool> used, std::vector<vector<int> >& combinations){
+void MassConstraintFitter::generateSubsets(std::vector<int> v, int k, int start, int currLen, std::vector<bool> used, std::vector<vector<int> >& combinations){
 	if(currLen == k) {
 		std::vector<int> indices;
 		for(unsigned int i=0; i<v.size(); i++){
@@ -899,11 +945,11 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	double fitprobmax = -1;
 	//double candidate_ijk[3] = {-1,-1,-1};
         vector<vector<int> > neutralCandidateIndices = generateIndicesCombinations(pneutral.size(), _nNeutral);
-	vector<vector<int> > chargedCandidateIndices = generateIndicesCombinations(_trackvec.size, _nCharged);
+	vector<vector<int> > chargedCandidateIndices = generateIndicesCombinations(ptrack.size(), _nCharged);
 	double fitprob = -1;
 
 	//iterate and fit all particle combinations, save the best one
-	for(unsigned int i=0; i<pneutral.size();i++){
+	/*for(unsigned int i=0; i<pneutral.size();i++){
 		for(unsigned int j=0; j<pplus.size(); j++){
 			for(unsigned int k=0; k<pminus.size(); k++){
 
@@ -937,6 +983,19 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 					delete part2;
 					delete fitter;	
 				}
+			}
+		}
+	}*/
+	//iterate and fit all particle combinations, save the best one (highest fit probability)
+	double chargeSum= 0.0;
+	for(unsigned int i=0; i< neutralCandidateIndices.size(); i++){
+		for(unsigned int j=0; j< chargedCandidateIndices.size(); i++){
+			for( unsigned int k=0; k<chargeCandidateIndices.at(j).size(); k++){
+				 (pTrackVec[chargeCandidateIndices.at(j).at(k)].getOmega() < 0 ) ? chargeSum+=-1.0 : chargeSum+=1.0) ;
+			}
+			//if charge is consistent with parent, try fitting
+			if(chargeSum == _parentCharge){
+				setupfit(neutralCandidateIndices.at(i), chargedCandidateIndices.at(j));
 			}
 		}
 	}
