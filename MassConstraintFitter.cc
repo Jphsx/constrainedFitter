@@ -940,8 +940,13 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 			}
 		}
 	}*/
-	//iterate and fit all particle combinations, save the best one (highest fit probabilit)
-	for(unsigned int i=0;
+	//iterate and fit all particle combinations, save the best one (highest fit probability)
+	for(unsigned int i=0; i< neutralCandidateIndices.size(); i++){
+		for(unsigned int j=0;, j< chargedCandidateIndices.size(); i++){
+				
+			
+		}
+	}
      
 	std::cout<<"loop completed"<<std::endl;
 	//recompute params for best fit probability
