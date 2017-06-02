@@ -770,14 +770,12 @@ BaseFitter* MassConsraintFitter::setUpFit(vector<int> neutralIndices, vector<int
 	///////////////////	
 
 	//add constraints and fit objects to fitter
-
-	for(unsigned int i=0; i< neutralIndices.size(); i++){
-		fitter->addFitObject( neutralJets[i] );
-	}
 	for(unsigned int i=0; i< chargedIndices.size(); i++){
 		fiter->addFitObject( chargedFO[i] );
 	}
-
+	for(unsigned int i=0; i< neutralIndices.size(); i++){
+		fitter->addFitObject( neutralJets[i] );
+	}
 	//add the things, what order should i use? charged then neutral?
 	fitter->addConstraint(mc);
 	
@@ -928,6 +926,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 				 (pTrackVec[chargeCandidateIndices.at(j).at(k)].getOmega() < 0 ) ? chargeSum+=-1.0 : chargeSum+=1.0) ;
 			}
 			//if charge is consistent with parent, try fitting
+			//TODO check and see if neutral types are consistent?
 			if(chargeSum == _parentCharge){
 				OPALFitterGSL* fitter = setUpFit(neutralCandidateIndices.at(i), chargedCandidateIndices.at(j), pneutral, ptrack, pNeutralVec, pTrackVec);
 			}
