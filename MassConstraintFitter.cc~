@@ -536,19 +536,27 @@ void MassConstraintFitter::PrintCov(double* cov, int dim){
 }
 //===================================================================================
 //take in the fit covariance matrix and convert it to global fit error vectors for readability
-void MassConstraintFitter::setFitErrors(double* cov){
+//*updated now takes in cov, and based on #of particles/neutrals/charged builds the error data structures for fit particles
+//it goes charged and then neutrals
+void MassConstraintFitter::setFitErrors(double* cov, int dim){
 
-	gammafit_err.push_back(  std::sqrt(cov[60]) );
-	gammafit_err.push_back(  std::sqrt(cov[70]) );
-	gammafit_err.push_back(  std::sqrt(cov[80]) );
-	
-	p1fit_err.push_back(  std::sqrt(cov[0]) );
-	p1fit_err.push_back(  std::sqrt(cov[10]) );
-	p1fit_err.push_back(  std::sqrt(cov[20]) );
-	
-	p2fit_err.push_back(  std::sqrt(cov[30]) );
-	p2fit_err.push_back(  std::sqrt(cov[40]) );
-	p2fit_err.push_back(  std::sqrt(cov[50]) );
+	//diagonals are every 10 indices so add 10
+	std::vector<double> temp_err;
+	int chargeCounter=0;
+	for(int i=0; i<dim*dim; i = i+10){
+		temp_err.push_back(cov[i]);
+		if( temp_err.size() == 3){
+			if(chargeCounter < chargedFO.size()){
+				fitCharged_err.push_back(temp_err);
+				chargeCounter++;
+				temp_err.clear();
+			}
+			else{
+				fitNeutral_err.push_back(temp_err);
+				temp_err.clear();
+			}
+		}
+	}
  
 
 }
@@ -558,9 +566,15 @@ void MassConstraintFitter::setFitErrors(double* cov){
 double* MassConstraintFitter::ConstructParentMeasCovMatrix(){
 //concat vectors	
 	std::vector<double> params;
-	params.insert(params.end(), p1meas_err.begin(), p1meas_err.end());
-	params.insert(params.end(), p2meas_err.begin(), p2meas_err.end());
-	params.insert(params.end(), gammameas_err.begin(), gammameas_err.end());
+	//params.insert(params.end(), p1meas_err.begin(), p1meas_err.end());
+	//params.insert(params.end(), p2meas_err.begin(), p2meas_err.end());
+	//params.insert(params.end(), gammameas_err.begin(), gammameas_err.end());
+	for(int i=0; i< measCharged_err.size(); i++){
+		params.insert(params.end(), measCharged_err.at(i).begin(), measCharged_err.at(i).end());
+	}
+	for(int i=0; i< measNeutral_err.size(); i++){
+		params.insert(params.end(), measNeutral_err.at(i).begin(), measNeutral_err.at(i).end());
+	}
 	int dim = params.size();
 
 	double* meascov = new double[dim*dim];
@@ -599,8 +613,63 @@ void MassConstraintFitter::setParentErrors(FloatVec meascov, FloatVec fitcov){
 	parentfit_err.push_back( std::sqrt(fitcov[10]) );
 	parentfit_err.push_back( std::sqrt(fitcov[15]) );
 }
+std::vector<double> MassConstraintFitter::ConsructChargedSubMatrix(TLorentzVector p){
+	std::vector<double> submat;
+	//submatrix jacobian is this (derivatives of parent wrt to charged parameter
+	/* 
+	   dPx/dk dPx/dtheta dPx/dphi
+	   dPy/dk dPy/dtheta dPy/dphi
+	   dPz/dk dPz/dtheta dPz/dphi
+	   dE/dk dE/dtheta dE/dphi
+	*/
+	submat.push_back(-p.Perp() *  p.Px());
+	submat.push_back(p.Pz()*p.Px()/p.Perp());
+	submat.push_back(-p.Py());
+	submat.push_back(-p.Perp() * p.Py());
+	submat.push_back(p.Pz()*p.Py()/p.Perp());
+	submat.push_back(p.Px());
+	submat.push_back(-p.Perp()*p.P());
+	submat.push_back(-p.Perp());
+	submat.push_back(0.0);
+	submat.push_back(1.0);
+	submat.push_back(0.0);
+	submat.push_back(0.0);
+
+	return submat;
+}
+std::vector<double> MassConstraintFitter::ConstructNeutralSubMatrix(TLorentzVector p){
+	std::vector<double> submat;
+	//submatrix jacobian is this (derivatives of parent(Px,Py,Pz,E) wrt to neutral parameter)
+	/*
+	  dPx/dE dPx/dtheta dPx/dphi
+	  dPy/dE dPy/dtheta dPy/dphi
+	  dPz/dE dPz/dtheta dPz/dphi
+	  dEp/dEc dEp/dtheta dEp/dphi
+	*/ 
+	submat.push_back(p.Px()/p.P());
+	submat.push_back(p.Pz()*p.Px()/p.Perp());
+	submat.push_back(-p.Py());
+	submat.push_back(p.Py()/p.P());
+	submat.push_back(p.Pz()*p.Py()/p.Perp());
+	submat.push_back(p.Px());
+	submat.push_back(p.Pz()/p.P());
+	submat.push_back(-p.Perp());
+	submat.push_back(0.0);
+	submat.push_back(1.0);
+	submat.push_back(0.0);
+	submat.push_back(0.0);
+
+	return submat;
+	
+}
+double* MassConstraintFitter::ConcatSubMatrices(std::vector<std::vector<double> > matrices ){
+	//this is the correctly arranged jacobian made in a vector and then copied to the desired type double*
+	std::vector<double> jacobian
+}
 //===================================================================================
-FloatVec MassConstraintFitter::ConstructCovMatrix(TLorentzVector p1, TLorentzVector p2, TLorentzVector p3, double*  cov){
+//FloatVec MassConstraintFitter::ConstructCovMatrix(TLorentzVector p1, TLorentzVector p2, TLorentzVector p3, double*  cov){
+FloatVec MassConstraintFitter::ConstructCovMatrix(std::vector<TLorentzVector> neutral, std::vector<TLorentzVector> charged, double* cov){
+
         
           double Energy; //parent energy
           double Mom[3]; // parent momentum
@@ -962,7 +1031,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	
 					
 	int cov_dim;
-	double * cov = fitter->getGlobalCovarianceMatrix(cov_dim);  //9x9
+	double * cov = fitter->getGlobalCovarianceMatrix(cov_dim);  //3*(r+k) === 3*(_nNeutral + _nCharged)
 	//construct measured cov matrix
 //	double * mcov = ConstructParentMeasCovMatrix();
 	//if cov matrix dimension is not correct return, fit did not converge
@@ -970,27 +1039,58 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 		evtNo++;
 		return;
 	}
-		
-	gammaFit.SetPxPyPzE(gammaJet->getPx(),gammaJet->getPy(),gammaJet->getPz(),gammaJet->getE());
-	p1Fit.SetPxPyPzE(part1->getPx(), part1->getPy(), part1->getPz(), part1->getE());
-	p2Fit.SetPxPyPzE(part2->getPx(), part2->getPy(), part2->getPz(), part2->getE());
+	
+	//build up fit data structures TLVs first
+	
+	//neutral
+	TLorentzVector temp;
+	for(int i=0; i<neutralJets.size() ; i++){
+		temp.SetPxPyPzE(neutralJets.at(i)->getPx(),neutralJets.at(i)->getPy(), neutralJets.at(i)->getPz(), neutralJets.at(i)->getE());
+		fitNeutral.push_back(temp);
+	}
+	for(int i=0; i<chargedFO.size() ; i++){
+		temp.SetPxPyPzE(chargedFO.at(i)->getPx(), chargedFO.at(i)->getPy(), chargedFO.at(i)->getPz(), chargedFO.at(i)->getE());
+		fitCharged.push_back(temp);
+	}
+	for(int i=0; i<fitNeutral.size(); i++){
+		fitParent += fitNeutral.at(i);	
+	}
+	for(int i=0; i<fitCharged.size(); i++){
+		fitParent += fitCharged.at(i);
+	}
 
-        parentFit = gammaFit + p1Fit + p2Fit;
 
-	//sets gammafit_err
-	setFitErrors(cov);
 
+	
+	//sets an array of charged and neutral errors arrays from cov
+	setFitErrors(cov, cov_dim);
+	std::vector<ReconstructedParticle*> recoNeutraltemp; // be safe and clear these at the end
+	std::vector<Track*> recoTracktemp;
 	//put candidates into local LorentzVector for ease of coding and readability
-	p1meas = pplus[candidate_ijk[1]];
-	p2meas = pminus[candidate_ijk[2]];
-	gammameas = pgamma[candidate_ijk[0]];
-        parentmeas = p1meas + p2meas + gammameas;
+	//do TLVs first then make new RecoParts to get generate errors
+	for(int i=0; i<bestCandidatesCharged.size(); i++){
+		measCharged.push_back( ptrack.at(bestCandidatesCharged[i]));
+		recoTracktemp.push_back(pTrackVec.at(bestCandidatesCharged[i]));
+	}
+	for(int i=0; i<bestCandidatesNeutral.size(); i++){
+		measNeutral.push_back( pneutral.at(bestCandidatesNeutral[i]));
+		recoNeutraltemp.push_back( pNeutralVec.at(bestCandidatesNeutral[i]));
+	}
+	//make reco particles
+
+
 	//also have error arrays ready locally for readability
 	//Photon Errors go {dE,dTheta,dPhi}
 	//ChargedParticle errors go {dk, dTheta, dPhi}
-	p1meas_err = getChargedParticleErrors( p1meas, pPlusTrackVec[candidate_ijk[1]]);
-	p2meas_err = getChargedParticleErrors( p2meas, pMinusTrackVec[candidate_ijk[2]]);
-	gammameas_err = getPhotonErrors( gammameas );
+	for(int i=0; i<measCharged.size(); i++){
+		measCharged_err.push_back( getChargedParticleErrors(measCharged.at(i), recoTracktemp.at(i)) );
+	}
+	for(int i=0; i<measNeutral.size(); i++){
+		measNeutral_err.push_back( getNeutralErrors( measNuetral.at(i), recoNeutraltemp.at(i)) );
+	}
+	//p1meas_err = getChargedParticleErrors( p1meas, pPlusTrackVec[candidate_ijk[1]]);
+	//p2meas_err = getChargedParticleErrors( p2meas, pMinusTrackVec[candidate_ijk[2]]);
+	//gammameas_err = getPhotonErrors( gammameas );
 	
 	//construct measured cov matrix must be called after measured global vectors are populated
 	double * mcov = ConstructParentMeasCovMatrix();

@@ -110,7 +110,7 @@ class DiTrackGammaCandidateFinder : public marlin::Processor {
   vector<double> measNeutralPdg;
   vector<double> measChargedPdg;
 
-	//vector<double>: (E|k, Theta, Phi); pull order
+	//vector<double>: (E || k, Theta, Phi); pull order
   vector<vector<double> > fitmeas_NeutralPulls;
   vector<vector<double> > fitmeas_ChargedPulls;
 
@@ -128,7 +128,7 @@ class DiTrackGammaCandidateFinder : public marlin::Processor {
   vector<TLorentzVector> genNeutral;
   vector<TLorentzVector> genCharged;
 
-	//vector<double>? (E|k, Theta, Phi); pull order
+	//vector<double>? (E || k, Theta, Phi); pull order
   vector<vector<double> > measgen_NeutralPulls;
   vector<vector<double> > measgen_ChargedPulls;
   vector<vector<double> > fitgen_NeutralPulls;
