@@ -662,83 +662,53 @@ std::vector<double> MassConstraintFitter::ConstructNeutralSubMatrix(TLorentzVect
 	return submat;
 	
 }
-double* MassConstraintFitter::ConcatSubMatrices(std::vector<std::vector<double> > matrices ){
+double* MassConstraintFitter::ConcatSubMatrices(std::vector<std::vector<double> > matrices,  ){
 	//this is the correctly arranged jacobian made in a vector and then copied to the desired type double*
-	std::vector<double> jacobian
+	std::vector<double> jacobian;
+	int counter=0;//counter tracks array position every 3rd element in a submatrix is a new row
+	int stop=counter+3;
+	for(int i =0; i<matrices.size(); i++){
+		for( int j=counter; j<stop; j++){
+			jacobian.push_back(matrices.at(i).at(j));	
+		}
+		counter = stop;
+		stop = stop+3;
+	}
+
+	//copy to double* because thats efficient :)
+	double* jacobian2 = new double[jacobian.size()];
+	for(int i=0; i<jacobian.size(); i++){
+		jacobian2[i] = jacobian.at(i);
+	}
+
+	return jacobian2;
+	
 }
 //===================================================================================
 //FloatVec MassConstraintFitter::ConstructCovMatrix(TLorentzVector p1, TLorentzVector p2, TLorentzVector p3, double*  cov){
-FloatVec MassConstraintFitter::ConstructCovMatrix(std::vector<TLorentzVector> neutral, std::vector<TLorentzVector> charged, double* cov){
+FloatVec MassConstraintFitter::ConstructCovMatrix(std::vector<TLorentzVector> charged, std::vector<TLorentzVector> neutral, double* cov){
 
-        
-          double Energy; //parent energy
-          double Mom[3]; // parent momentum
-      // The 4-vector of the fitted gamma-gamma is the sum of the two fitted 4-vectors.
-
-      // Get the individual fitted photon 4-vectors - needed to calculate the four-momentum covariance matrix of the gamma-gamma system
-          double Mom1[3],Mom2[3], Mom3[3]; //momentum of +,-,gamma
-          double E1,E2,E3; // energy of +,-,gamma
-          double pT1,pT2, pT3; // transverse momentum of +,-,gamma
-          double P1,P2,P3;
-
-          E1 = p1.E();
-          Mom1[0] = p1.Px();
-          Mom1[1] = p1.Py();
-          Mom1[2] = p1.Pz();
-          pT1 = sqrt(Mom1[0]*Mom1[0] + Mom1[1]*Mom1[1]);
-	  P1 = sqrt( Mom1[0]*Mom1[0] + Mom1[1]*Mom1[1] + Mom1[2]*Mom1[2]);
-
-          E2 = p2.E();
-          Mom2[0] = p2.Px();
-          Mom2[1] = p2.Py();
-          Mom2[2] = p2.Pz();
-          pT2 = sqrt(Mom2[0]*Mom2[0] + Mom2[1]*Mom2[1]);
-	  P2 = sqrt(Mom2[0]*Mom2[0] + Mom2[1]*Mom2[1] + Mom2[2]*Mom2[2]);
-
-	  E3 = p3.E();
-	  Mom3[0] = p3.Px();
-	  Mom3[1] = p3.Py();
-	  Mom3[2] = p3.Pz();
-	  pT3 = sqrt(Mom3[0]*Mom3[0] + Mom3[1]*Mom3[1]);
-          P3 = sqrt(Mom3[0]*Mom3[0] + Mom3[1]*Mom3[1] + Mom3[2]*Mom3[2]);
-
-          Energy = E1 + E2 + E3;
-          Mom[0] = Mom1[0] + Mom2[0] + Mom3[0];
-          Mom[1] = Mom1[1] + Mom2[1] + Mom3[1];
-          Mom[2] = Mom1[2] + Mom2[2] + Mom3[2];
-
-       //   FloatVec covP(10, 0.0);
+      
             FloatVec covP(16,0.0);
       //  (px,py,pz,E)
 
       //  Follow for now implementation in FourMomentumCovMat based on TMatrixD
 
-         // if(cov_dim == 9 ){
-         if(true){
       // Note some cases of cov_dim != 6 have been seen ...
-             const int nrows      = 9; // n rows jacobian
-             const int ncolumns   = 4; // n columns jacobian //these look backwards
-
-      //  Transformation matrix D (6*4) between (E1, theta1, phi1, E2, theta2, phi2) and (px, py, pz, E)
-            // double jacobian_by_columns[nrows*ncolumns] = {
-            //    Mom1[0]/E1, Mom1[0]*Mom1[2]/pT1, -Mom1[1], Mom2[0]/E2, Mom2[0]*Mom2[2]/pT2, -Mom2[1],
-            //    Mom1[1]/E1, Mom1[1]*Mom1[2]/pT1,  Mom1[0], Mom2[1]/E2, Mom2[1]*Mom2[2]/pT2,  Mom2[0],
-             //   Mom1[2]/E1,        -pT1        ,    0.0  , Mom2[2]/E2,        -pT2        ,     0.0 ,
-              //     1.0    ,         0.0        ,    0.0  ,    1.0    ,         0.0        ,     0.0   };
-	 //Transformation matrix D (9*4) between (E1,theta1,phi1,E2,theta2,phi2,E3,theta3,phi3) and (px,py,pz,E)
-	 double jacobian_by_columns[nrows*ncolumns] = {
--pT1*Mom1[0], Mom1[0]*Mom1[2]/pT1, -Mom1[1], -pT2*Mom2[0], Mom2[0]*Mom2[2]/pT2, -Mom2[1], Mom3[0]/E3, Mom3[0]*Mom3[2]/pT3, -Mom3[1],
--pT1*Mom1[1], Mom1[1]*Mom1[2]/pT1,  Mom1[0], -pT2*Mom2[1], Mom2[1]*Mom2[2]/pT2,  Mom2[0], Mom3[1]/E3, Mom3[1]*Mom3[2]/pT3,  Mom3[0],
--pT1*P1     ,        -pT1,              0,   -pT2*P2     ,         -pT2,            0,    Mom3[2]/E3,        -pT3,            0,
--pT1*P1*P1/E1,         0,               0,   -pT2*P2*P2/E2,          0,             0,         1,              0,             0   };
+             const int nrows  = 3*(_nCharged+_nNeutral);  
+             const int ncolumns  =4; 
 
 
-//test:: try particle order 312 instead of 123 (photon first in jacobian)
-//	double jacobian_by_columns[nrows*ncolumns] = {
-// Mom3[0]/E3, Mom3[0]*Mom3[2]/pT3, -Mom3[1], -pT1*Mom1[0], Mom1[0]*Mom1[2]/pT1, -Mom1[1], -pT2*Mom2[0], Mom2[0]*Mom2[2]/pT2, -Mom2[1],
-// Mom3[1]/E3, Mom3[1]*Mom3[2]/pT3,  Mom3[0], -pT1*Mom1[1], Mom1[1]*Mom1[2]/pT1,  Mom1[0], -pT2*Mom2[1], Mom2[1]*Mom2[2]/pT2,  Mom2[0],
-// Mom3[2]/E3,        -pT3,            0, -pT1*P1     ,        -pT1,              0,   -pT2*P2     ,         -pT2,            0, 
- //    1,              0,             0,    -pT1*P1*P1/E1,         0,               0,   -pT2*P2*P2/E2,          0,             0 };
+	std::vector<std::vector<double> > matrices;
+	for(int i =0; i< neutral.size(); i++){
+		matrices.push_back(ConsructChargedSubMatrix(neutral.at(i));
+	}
+	for(int i= 0; i< charged.size(); i++){	
+		matrices.push_back(ConstructNeutralSubMatrix(charged.at(i));
+	}
+
+	double* jacobian = ConcatSubMatrices(matrices);
+
 
       //  Now set up to calculate the new covariance matrix, namely  V' = D^T V D
              TMatrixD Dmatrix(nrows,ncolumns, jacobian_by_columns, "F");
@@ -753,23 +723,6 @@ FloatVec MassConstraintFitter::ConstructCovMatrix(std::vector<TLorentzVector> ne
         		covP[index] = Covmatrix(ii,jj);
 			index++;
                  }                  
-             }
-
-        /*     covP[0] = Covmatrix(0,0); // px-px
-             covP[1] = Covmatrix(0,1); // px-py
-             covP[2] = Covmatrix(1,1); // py-py
-             covP[3] = Covmatrix(0,2); // px-pz
-             covP[4] = Covmatrix(1,2); // py-pz
-             covP[5] = Covmatrix(2,2); // pz-pz
-             covP[6] = Covmatrix(0,3); // px-E
-             covP[7] = Covmatrix(1,3); // py-E
-             covP[8] = Covmatrix(2,3); // pz-E
-             covP[9] = Covmatrix(3,3); // E-E
-	*/
-          }
-          else{
-              // if(_printing>1)std::cout << " Fit has no valid covariance information (cov_dim = " << cov_dim << " )" << std::endl;              
-          }
 
 	return covP;
 } 
@@ -1026,6 +979,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	setUpFit(vector<int> neutralIndices, vector<int> chargedIndices,
 					vector<TLorentzVector> pneutral, vector<TLorentzVector> ptrack,
 					vector<ReconstructedParticle*> pNeutralVec, vector<Track*> pTrackVec){    
+
 	//now refit with best candidates
 	OPALFitterGSL* fitter = setUpFit(neutralIndices, chargedIndices, pneutral, ptrack, pNeutralVec, pTrackVec);
 	
@@ -1088,51 +1042,70 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	for(int i=0; i<measNeutral.size(); i++){
 		measNeutral_err.push_back( getNeutralErrors( measNuetral.at(i), recoNeutraltemp.at(i)) );
 	}
-	//p1meas_err = getChargedParticleErrors( p1meas, pPlusTrackVec[candidate_ijk[1]]);
-	//p2meas_err = getChargedParticleErrors( p2meas, pMinusTrackVec[candidate_ijk[2]]);
-	//gammameas_err = getPhotonErrors( gammameas );
 	
 	//construct measured cov matrix must be called after measured global vectors are populated
 	double * mcov = ConstructParentMeasCovMatrix();
 
 	//populate measured  parent errors from covariance matrix
-	FloatVec fitParentCov =  ConstructCovMatrix(p1Fit,p2Fit,gammaFit,cov);  
-	FloatVec measParentCov = ConstructCovMatrix(p1meas,p2meas,gammameas,mcov);
+	FloatVec fitParentCov =  ConstructCovMatrix(fitCharged,fitNeutral,cov);  
+	FloatVec measParentCov = ConstructCovMatrix(measCharged,measNeutral,mcov);
 	setParentErrors(measParentCov, fitParentCov);
 	
+	
 
+
+///im to this point
 	if(_printing>3){
 		std::cout <<"Optimal Candidate Fit Quantities-------------"<<std::endl;
 		std::cout << "Constrained fit results  RC: " << fitter->getError() << std::endl;
-		std::cout << "Measured mass = " << parentmeas.M() << std::endl;
+		std::cout << "Measured mass = " << measParent.M() << std::endl;
 		std::cout << "No. of iterations " << fitter->getIterations() << std::endl;
 		std::cout << "Fit probability = " << fitprob << std::endl;
 		std::cout << "Covariance matrix dimension " << cov_dim << std::endl;
 		std::cout << "Candidates Post Fit: "<< std::endl;
-		std::cout << "track1 particle (k,theta,phi): "<< 1/p1Fit.Perp() <<" " << p1Fit.Theta() << " "<< p1Fit.Phi()<<std::endl;
-		std::cout << "track2 particle (k,theta,phi): "<< 1/p2Fit.Perp() <<" " << p2Fit.Theta() << " "<< p2Fit.Phi()<<std::endl;
-		std::cout << "gamma (E,theta, phi): "<< gammaFit.E()<<" " <<gammaFit.Theta()<< " "<< " " <<gammaFit.Phi()<<std::endl;
-		std::cout << "Gamma residual (fit-meas) (dE,dTheta,dPhi) " << gammaFit.E()-gammameas.E() << " " << gammaFit.Theta()-gammameas.Theta() << " " << gammaFit.Phi()-gammameas.Phi() << std::endl;
-		std::cout << "DEBUG VALS (fit meas) " << gammaFit.E() <<" "<< gammameas.E() << " | " << gammaFit.Theta() << " " << gammameas.Theta()<< " | "<< gammaFit.Phi()<<" "<<gammameas.Phi()<<std::endl;
-		std::cout << "P1 residual (fit-meas) (dk,dTheta,dPhi) " << 1/p1Fit.Perp()-1/p1meas.Perp() << " " << p1Fit.Theta()-p1meas.Theta() << " " << p1Fit.Phi()-p1meas.Phi() << std::endl;
-		std::cout << "DEBUG VALS (fit meas) " << 1/p1Fit.Perp() << " " << 1/p1meas.Perp() << " | " << p1Fit.Theta() << " "<<p1meas.Theta()<<" | "<<p1Fit.Phi()<<" "<<p1meas.Phi()<<std::endl;
-		std::cout << "P2 residual (fit-meas) (dk,dTheta,dPhi) " << 1/p2Fit.Perp()-1/p2meas.Perp() << " " << p2Fit.Theta()-p2meas.Theta() << " " << p2Fit.Phi()-p2meas.Phi() << std::endl;
-		std::cout << "DEBUG VALS (fit meas) " << 1/p2Fit.Perp() <<" "<< 1/p2meas.Perp() <<" | "<<p2Fit.Theta() <<" "<<p2meas.Theta()<<" | "<<p2Fit.Phi()<<" "<<p2meas.Phi() << std::endl;	
-		std::cout << "Parent residual (particle fit sum - particle meas sum) (dE,dTheta,dPhi) " << parentFit.E()-parentmeas.E() << " " << parentFit.Theta()-parentmeas.Theta() << " " << getPhiResidual(parentFit.Phi(),parentmeas.Phi()) << std::endl;
-		std::cout << "Parent Measured Energy "<< parentmeas.E() <<" Parent Fit Energy "<< parentFit.E()<<std::endl;
+		
+		for(int i=0; i< fitCharged.size(); i++){
+			std::cout << "Track "<< i <<" (k,theta,phi,M): "<<std::endl;
+			std::cout << " Measured: "<< 1/measCharged.at(i).Perp() <<" "<< measCharged.at(i).Theta() <<" "<<measCharged.at(i).Phi()<<" "<<measCharged.at(i).M()<<" ";
+			std::cout << " Fit: " << 1/fitCharged.at(i).Perp() <<" "<<fitCharged.at(i).Theta() <<" "<<fitCharged.at(i).Phi()<<" "<<fitChaged.at(i).M()<<std::endl;
+			std::cout << "Track "<< i <<" Errors (dk, dtheta, dphi): "<<std::endl;
+			std::cout << "Measured: ";
+			for(int j=0; j<measCharged_err.at(i).size(); j++){
+				std::cout<< measCharged_err.at(i).at(j);
+			}
+			std::cout <<" Fit: ";
+			for(int j=0; j<fitCharged_err.at(i).size(); j++){
+				std::cout<< fitCharged_err.at(i).at(j);
+			}
+			std::cout<<std::endl;
+
+		}
+
+		for(int i=0; i< fitNeutral.size(); i++){
+			std::cout << "Neutral "<< i <<" (E,theta,phi,M): "<<std::endl;
+			std::cout << " Measured: "<< measNeutral.at(i).E() <<" "<< measNeutral.at(i).Theta() <<" "<<measNeutral.at(i).Phi()<<" "<<measNeural.at(i).M()<<" ";
+			std::cout << " Fit: " << fitNeutral.at(i).E() <<" "<<fitNeutral.at(i).Theta() <<" "<<fitNeutral.at(i).Phi()<<" "<<fitNeural.at(i).M()<<std::endl;
+			std::cout << "Neutral "<< i <<" Errors (dE, dtheta, dphi): "<<std::endl;
+			std::cout << "Measured: ";
+			for(int j=0; j<measNeutral_err.at(i).size(); j++){
+				std::cout<< measNeutral_err.at(i).at(j);
+			}
+			std::cout <<" Fit: ";
+			for(int j=0; j<fitNeutral_err.at(i).size(); j++){
+				std::cout<< fitNeutral_err.at(i).at(j);
+			}
+			std::cout<<std::endl;
+
+		}
+		
+		 
+		std::cout << "Parent Measured Energy "<< measParent.E() <<" Parent Fit Energy "<< fitParent.E()<<std::endl;
 		std::cout <<"----------------------"<<std::endl;
 
-		//fit cov matrix is in the order in which fit objects are added, in a column-wise array. Set up does Photon,particle1+, particle2-. So, the diagonal for variances of the 9 parameters are as follows:
-		//Particle:  Photon		P1		P2
-		//Parameter: dE,dTheta,dPhi	k,dTheta,dPhi	k,dTheta,dPhi
-		//Indices:   60,70,80		0,10,20 	30,40,50
-//		for ( int i=0; i<cov_dim*cov_dim; i=( i+cov_dim+1) ){
-//			std::cout << "Covariance matrix element sqrt(diagonal) " << i << " fit:  " << std::sqrt(cov[i]) << " measured: "<< std::sqrt(mcov[i]) <<  std::endl;                   
-//		}
-		std::cout<<"Measured Covariance Matrix 9x9: "<<std::endl;
-		PrintCov(mcov,9);
-		std::cout<<"Fit Covariance Matrix 9x9: "<<std::endl;
-		PrintCov(cov,9);
+		std::cout<<"Measured Covariance Matrix: "<<std::endl;
+		PrintCov(mcov,3*(_nCharged+_nNeutral));
+		std::cout<<"Fit Covariance Matrix: "<<std::endl;
+		PrintCov(cov,3*(_nCharged+_nNeutral));
 		std::cout<<"Measured Parent 4vector 4x4 Covariance Matrix: "<<std::endl;
 		PrintCov(measParentCov,4);
 		std::cout<<"Fit Parent 4vector 4x4 Covariance Matrix: "<<std::endl;
@@ -1144,6 +1117,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 		if(fitprob> _fitProbabilityCut){
 			//TODO:: add qualifying fits to collection that are less than optimal
 			ReconstructedParticleImpl * recoPart = new ReconstructedParticleImpl();
+			//also need to add a new track subcollection
 			recoPart->addParticle(pGammaPfoVec[candidate_ijk[0]]);
 			recoPart->addTrack(pPlusTrackVec[candidate_ijk[1]]);
 			recoPart->addTrack(pMinusTrackVec[candidate_ijk[2]]);
@@ -1306,113 +1280,4 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	return;
 }
 
-/*
-      // Make the reconstructed particle using the result of the constrained fit
-      // likely need some minimal fit probability cut - configurable for each gamma-gamma hypothesis
-          ReconstructedParticleImpl * recoPart = new ReconstructedParticleImpl();
-          recoPart->addParticle(pGammai);
-          recoPart->addParticle(pGammaj);
-          double Energy;
-          double Mom[3];
-      // The 4-vector of the fitted gamma-gamma is the sum of the two fitted 4-vectors.
 
-      // Get the individual fitted photon 4-vectors - needed to calculate the four-momentum covariance matrix of the gamma-gamma system
-          double Mom1[3],Mom2[3];
-          double E1,E2;
-          double pT1,pT2;
-
-          E1 = j1.getE();
-          Mom1[0] = j1.getPx();
-          Mom1[1] = j1.getPy();
-          Mom1[2] = j1.getPz();
-          pT1 = sqrt(Mom1[0]*Mom1[0] + Mom1[1]*Mom1[1]);
-
-          E2 = j2.getE();
-          Mom2[0] = j2.getPx();
-          Mom2[1] = j2.getPy();
-          Mom2[2] = j2.getPz();
-          pT2 = sqrt(Mom2[0]*Mom2[0] + Mom2[1]*Mom2[1]);
-
-          Energy = E1 + E2;
-          Mom[0] = Mom1[0] + Mom2[0];
-          Mom[1] = Mom1[1] + Mom2[1];
-          Mom[2] = Mom1[2] + Mom2[2];
-
-          FloatVec covP(10, 0.0);
-      //  (px,py,pz,E)
-
-      //  Follow for now implementation in FourMomentumCovMat based on TMatrixD
-
-          if(cov_dim == 6 ){
-      // Note some cases of cov_dim != 6 have been seen ...
-             const int nrows      = 6; // n rows jacobian
-             const int ncolumns   = 4; // n columns jacobian //these look backwards
-
-      //  Transformation matrix D (6*4) between (E1, theta1, phi1, E2, theta2, phi2) and (px, py, pz, E)
-             double jacobian_by_columns[nrows*ncolumns] = {
-                Mom1[0]/E1, Mom1[0]*Mom1[2]/pT1, -Mom1[1], Mom2[0]/E2, Mom2[0]*Mom2[2]/pT2, -Mom2[1],
-                Mom1[1]/E1, Mom1[1]*Mom1[2]/pT1,  Mom1[0], Mom2[1]/E2, Mom2[1]*Mom2[2]/pT2,  Mom2[0],
-                Mom1[2]/E1,        -pT1        ,    0.0  , Mom2[2]/E2,        -pT2        ,     0.0 ,
-                   1.0    ,         0.0        ,    0.0  ,    1.0    ,         0.0        ,     0.0   };
-
-      //  Now set up to calculate the new covariance matrix, namely  V' = D^T V D
-             TMatrixD Dmatrix(nrows,ncolumns, jacobian_by_columns, "F");
-             TMatrixD Vmatrix(nrows,nrows, cov, "F");                      // May need to have the filling array explicitly dimensioned ??
-             TMatrixD Covmatrix(ncolumns,ncolumns);                        // Hopefully this is good enough for initialization ?
-
-             Covmatrix.Mult( TMatrixD( Dmatrix, TMatrixD::kTransposeMult, Vmatrix) ,Dmatrix);   // Is this what we want ?
-
-             for(int ii=0;ii<4;ii++){
-                 for(int jj=0;jj<4;jj++){
-                    if(_printing>3)std::cout << "4-vector cov. " << ii << " " << jj << " " << Covmatrix(ii,jj) << std::endl;
-                 }                  
-             }
-
-             covP[0] = Covmatrix(0,0); // px-px
-             covP[1] = Covmatrix(0,1); // px-py
-             covP[2] = Covmatrix(1,1); // py-py
-             covP[3] = Covmatrix(0,2); // px-pz
-             covP[4] = Covmatrix(1,2); // py-pz
-             covP[5] = Covmatrix(2,2); // pz-pz
-             covP[6] = Covmatrix(0,3); // px-E
-             covP[7] = Covmatrix(1,3); // py-E
-             covP[8] = Covmatrix(2,3); // pz-E
-             covP[9] = Covmatrix(3,3); // E-E
-          }
-          else{
-               if(_printing>1)std::cout << " Fit has no valid covariance information (cov_dim = " << cov_dim << " )" << std::endl;              
-          }
-
-          recoPart->setEnergy( Energy );
-          recoPart->setMomentum( Mom );
-          recoPart->setMass( mass_constraint );
-          recoPart->setCharge( 0.0 );
-          recoPart->setCovMatrix( covP );
-
-      // For now - store the fit probability in the goodnessofPiD variable
-          float goodnessOfPID = float(fit_probability);
-//          if( mgg  < _ggResonanceMass)goodnessOfPID = - goodnessOfPID;
-          recoPart->setGoodnessOfPID( goodnessOfPID );
-
-      // Default choice is Pi0
-          recoPart->setType( 111 );
-          if(_ggResonanceName=="Eta")recoPart->setType( 221 );
-          if(_ggResonanceName=="EtaPrime")recoPart->setType( 331 );
-
-          if(_printing>1)std::cout << "Fitting " << _ggResonanceName << " gg candidate  M= " 
-                                   << mgg << " " << i << " " << j << " " << pgi.e() << " " << pgj.e() << 
-                                   " Fitted energies: " << j1.getE() << " " << j2.getE() 
-                                   << " Fit probability = " << fit_probability << std::endl; 
-
-      // Add it to the collection if it exceeds the required miminum fit probability
-          if(fit_probability > _fitProbabilityCut){
-             if(_printing>1)std::cout << "GG candidate passes fit probability cut - KEEP" << std::endl;
-             recparcol->addElement( recoPart );
-          }
-        }
-      }
-    }
-  }
-
-  return;
-} */
