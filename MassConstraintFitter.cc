@@ -1117,6 +1117,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 		if(fitprob> _fitProbabilityCut){
 			//TODO:: add qualifying fits to collection that are less than optimal
 			ReconstructedParticleImpl * recoPart = new ReconstructedParticleImpl();
+			TrackImpl* recoTrack = new TrackImpl();
 			//also need to add a new track subcollection
 			recoPart->addParticle(pGammaPfoVec[candidate_ijk[0]]);
 			recoPart->addTrack(pPlusTrackVec[candidate_ijk[1]]);

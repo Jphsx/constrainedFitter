@@ -1111,7 +1111,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 		std::cout<<"Fit Parent 4vector 4x4 Covariance Matrix: "<<std::endl;
 		PrintCov(fitParentCov,4);					     
 	}//end optimal fit printing
-								
+				//////////////IM up to this point, add pull stuff				
 			              
 	if(cov_dim > 0){//condition required because there is not always convergence in the fitting	
 		if(fitprob> _fitProbabilityCut){
