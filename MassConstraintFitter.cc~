@@ -133,6 +133,13 @@ MassConstraintFitter::MassConstraintFitter() : marlin::Processor("MassConstraint
 			     _outputParticleCollectionName,
 			     outputParticleCollectionName);
 
+  std::string outputTrackCollectionName = "MassConstraintCandidates";
+  registerOutputCollection( LCIO::TRACK,
+			    "OutputTrackCollectionName",
+			    "Output Particle Collection Name" ,
+			    _outputParticleCollectionName,
+			    outputTrackCollectionName);
+
   registerProcessorParameter( "FitProbabilityCut" , 
 			      "Minimum fit probability"  ,
 			      _fitProbabilityCut,
@@ -845,6 +852,45 @@ std::vector<std::vector<int> > MassConstraintFitter::generateIndicesCombinations
 	generateSubsets(master,k,0,0,used,combinations);
 	return combinations;
 }
+//clone the old RP and update the momentum/Energy from the fit
+//these construction methods need the fit errrors too
+ReconstructedParticleImpl* MassConstraintFitter::constructFitParticle(TLorentzVector fitp, ReconstructedParticle* measrp){
+	ReconstructedParticleImpl* fitp = new ReconstructedParticleImpl();
+	
+	fitrp = measrp->clone();
+	fitrp->setEnergy(fitp.E());
+	double* mom = new double[3];
+	mom[0]=fitp.Px();
+	mom[1]=fitp.Py();
+	mom[2]=fitp.Pz();
+	fitrp->setMomentum(mom);
+
+	return fitrp;
+	
+}
+//TODO ADD NEW FIT COV MATRIX
+Track* MassConstraintFitter::constructTrack(TLorentzVector fitp, Track* meast){
+	Track* fitt = new Track();
+	fitt = meast.clone();
+	const double c = 2.99792458e8; // m*s^-1
+  	const double B = marlin::Global::GEAR->getBField().at(gear::Vector3D(0.,0.,0.)).z();;          
+  	const double mm2m = 1e-3;
+  	const double eV2GeV = 1e-9;
+  	const double eB = B*c*mm2m*eV2GeV;
+	//update 
+	double sinlambda = fitp.Pz()/fitp.P();
+	double coslambda = fitp.Px()/(fitp.P()*cos(fitp.Phi()));
+	double tanlambda = sinlambda/coslambda;
+	double omega = eB/(fitp.P()*coslambda);
+	if(t->getOmega() < 0){
+		omega = -omega;
+	}
+	fitt->setPhi(fitp.Phi());
+	fitt->setTanLambda(tanlambda);
+	fitt->setOmega(omega);
+
+	return fitt;
+}
 //===================================================================================
 void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recparcol) {
 
@@ -974,11 +1020,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	if(bestCandidatesNeutral.size()==0 && bestCandidatesCharged.size()==0){
 		evtNo++; 
 		return;
-	}
-     
-	setUpFit(vector<int> neutralIndices, vector<int> chargedIndices,
-					vector<TLorentzVector> pneutral, vector<TLorentzVector> ptrack,
-					vector<ReconstructedParticle*> pNeutralVec, vector<Track*> pTrackVec){    
+	}  
 
 	//now refit with best candidates
 	OPALFitterGSL* fitter = setUpFit(neutralIndices, chargedIndices, pneutral, ptrack, pNeutralVec, pTrackVec);
@@ -1116,28 +1158,35 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	if(cov_dim > 0){//condition required because there is not always convergence in the fitting	
 		if(fitprob> _fitProbabilityCut){
 			//TODO:: add qualifying fits to collection that are less than optimal
-			ReconstructedParticleImpl * recoPart = new ReconstructedParticleImpl();
-			//also need to add a new track subcollection
-			recoPart->addParticle(pGammaPfoVec[candidate_ijk[0]]);
-			recoPart->addTrack(pPlusTrackVec[candidate_ijk[1]]);
-			recoPart->addTrack(pMinusTrackVec[candidate_ijk[2]]);
-
-			recoPart->setEnergy(parentFit.E());
-				
-			double mom[3] = {parentFit.Px(),parentFit.Py(),parentFit.Pz() };
-			recoPart->setMomentum(mom);
-			recoPart->setMass( _resonanceMass );
-			recoPart->setCharge(0.0);
-//			RETURN transformed cov matrix here
-			recoPart->setCovMatrix( fitParentCov );// this call needs fancy cov matrix
-			recoPart->setGoodnessOfPID((float)fitprob);
-
-			recoPart->setType( _resonancePID ); // make some selection for pid stuff, or add parameter to xm
 			
-			//add best fit candidate to output collections
-			if(_printing>1)std::cout << "candidate passes fit probability cut - KEEP" << std::endl;
-			recparcol->addElement( recoPart );
 
+			if(_parentCharge == 0){
+				//parent is neutral store as a reco
+				ReconstrucedParticleImpl * recoPart = new ReconstructedParticleImpl();
+				//adding old particles to fit particle because lazy and dont want to make new RecoParts*
+				for(int i=0; i<fitNeutral.size(); i++){
+					//NOTE: these constiuent particles dont have updated covariance matrices only P,E
+					recoPart->addParticle(constructFitParticle( fitNeutral.at(i),recoNeutraltemp.at(i)));
+				}
+				for(int i=0; i<recoTracktemp.size(); i++){
+					recoPart->addTrack(constructFitTrack( fitCharged.at(i),rectoTracktemp.at(i)));
+				}
+				recoPart->setEnergy(fitParent.E());
+				double mom[3] = {fitParent.Px(), fitParent.Py(), fitParent.Pz() };
+				recoPart->setMomentum(mom);
+				recoPart->setMass( _parentMass );
+				recoPart->setCharge( _parentCharge );
+				recoPart->setCovMatrix( fitParentCov );
+				recoPart->setType( _parentPdg );
+				recoPart->setGoodnessOfPID((float)fitprob);
+				if(_printing>1)std::cout << "candidate passes fit probability cut - KEEP" << std::endl;
+				recparcol->addElement( recoPart );
+				 
+			}
+			if(_parentCharge != 0){
+				//parent is charged store as a track
+				recoNeutraltemp
+			}
 			
 			//add stuff to regular ttree
 			if(_fitAnalysis){

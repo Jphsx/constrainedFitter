@@ -178,6 +178,7 @@ private:
   std::string _inputParticleCollectionName;
   std::string _mcParticleCollectionName;
   std::string _outputParticleCollectionName;
+  std::string _outputTrackCollectionName;
   double _fitProbabilityCut;
  
   int _ifitter;
