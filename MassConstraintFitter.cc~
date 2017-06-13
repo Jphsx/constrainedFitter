@@ -1185,7 +1185,9 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 			}
 			if(_parentCharge != 0){
 				//parent is charged store as a track
-				recoNeutraltemp
+				TrackImpl* recoTrack = TrackImpl();
+				recoTrack = constructFitTrack( fitCharged
+				
 			}
 			
 			//add stuff to regular ttree
