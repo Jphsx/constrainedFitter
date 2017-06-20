@@ -11,7 +11,8 @@
 #include "TLorentzVector.h"
 typedef CLHEP::HepLorentzVector LorentzVector ;
 
-#include "LeptonFitObject.h"
+//#include "LeptonFitObject.h"
+#include "TrackParticleFitObject.h"
 #include "JetFitObject.h"
 #include "OPALFitterGSL.h"
 #include "NewFitterGSL.h"
@@ -166,7 +167,8 @@ private:
 
   //LeptonFitObject* part1;
  // LeptonFitObject* part2;
-  std::vector<LeptonFitObject*> chargedFO; 
+//  std::vector<LeptonFitObject*> chargedFO; 
+    std::vector<TrackParticleFitObject*> TrackFO;
 //  OPALFitterGSL* fitter;
     BaseFitter* ftest;
 
