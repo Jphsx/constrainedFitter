@@ -196,13 +196,17 @@ void MassConstraintFitter::init() {
 
 	tree->Branch("measNeutral.", "vector<TLorentzVector>", &measNeutral);
         tree->Branch("measCharged.", "vector<TLorentzVector>", &measCharged);
+	tree->Branch("measTrack.","vector<vector<double> >", &measTrack);
         tree->Branch("fitNeutral.", "vector<TLorentzVector>", &fitNeutral);
         tree->Branch("fitCharged.", "vector<TLorentzVector>", &fitCharged);
+	tree->Branch("fitTrack.", "vector<vector<double> >",&fitTrack);
 
 	tree->Branch("measNeutral_err.", "vector<vector<double> >", &measNeutral_err);
 	tree->Branch("measCharged_err.", "vector<vector<double> >", &measCharged_err);
+	tree->Branch("measTrack_err.","vector<vector<double> >",&measTrack_err);
 	tree->Branch("fitNeutral_err.", "vector<vector<double> >", &fitNeutral_err);
 	tree->Branch("fitCharged_err.", "vector<vector<double> >", &fitCharged_err);
+	tree->Branch("fitTrack_err.", "vector<vector<double> >",&fitTrack_err);
 
 	tree->Branch("measNeutralPdg.", "vector<double>", &measNeutralPdg);
 	tree->Branch("measChargedPdg.", "vector<double>", &measChargedPdg);
@@ -574,11 +578,11 @@ void MassConstraintFitter::setFitErrors(double* cov, int dim){
 
 }
 //===================================================================================
-//manually constructs the 9x9 covariance matrix for parent particle, meant to be transformed into 4x4 4vector form
+//manually constructs the  covariance matrix for parent particle, meant to be transformed into 4x4 4vector form
 //***********This is to be used after the global measured errors vectors are  populated**************************
 double* MassConstraintFitter::ConstructParentMeasCovMatrix(){
 //concat vectors	
-	std::vector<double> params;
+	std::vector<double> params;  //THIS may be missing START/END param
 	//params.insert(params.end(), p1meas_err.begin(), p1meas_err.end());
 	//params.insert(params.end(), p2meas_err.begin(), p2meas_err.end());
 	//params.insert(params.end(), gammameas_err.begin(), gammameas_err.end());
@@ -626,7 +630,8 @@ void MassConstraintFitter::setParentErrors(FloatVec meascov, FloatVec fitcov){
 	parentfit_err.push_back( std::sqrt(fitcov[10]) );
 	parentfit_err.push_back( std::sqrt(fitcov[15]) );
 }
-std::vector<double> MassConstraintFitter::ConsructChargedSubMatrix(TLorentzVector p){
+//input 6 parameter track stuff
+std::vector<double> MassConstraintFitter::ConsructChargedSubMatrix(std::vector<double> p, TLorentzVector ptlv){
 	std::vector<double> submat;
 	//submatrix jacobian is this (derivatives of parent wrt to charged parameter
 	/* 
@@ -635,7 +640,7 @@ std::vector<double> MassConstraintFitter::ConsructChargedSubMatrix(TLorentzVecto
 	   dPz/dk dPz/dtheta dPz/dphi
 	   dE/dk dE/dtheta dE/dphi
 	*/
-	submat.push_back(-p.Perp() *  p.Px());
+	/*submat.push_back(-p.Perp() *  p.Px());
 	submat.push_back(p.Pz()*p.Px()/p.Perp());
 	submat.push_back(-p.Py());
 	submat.push_back(-p.Perp() * p.Py());
@@ -646,7 +651,29 @@ std::vector<double> MassConstraintFitter::ConsructChargedSubMatrix(TLorentzVecto
 	submat.push_back(0.0);
 	submat.push_back(1.0);
 	submat.push_back(0.0);
-	submat.push_back(0.0);
+	submat.push_back(0.0);*/
+
+	/*  
+		dpx/dd0 dpx/dphi dpx/dome dpx/dz0 dpx/dtanl dpx/dstart
+		dpy/dd0 dpy/dphi dpy/dome dpy/dz0 dpy/dtanl dpy/dstart
+		dpz/dd0 dpz/dphi dpz/dome dpz/dz0 dpz/dtanl dpz/dstart
+		de/dd0 de/dphi de/dome de/dz0 de/dtanl de/dstart
+
+	*/
+	submat.push_back(0); //dpx/dd0
+	submat.push_back(-ptlv.P); //dpx/dphi ...
+ 	submat.push_back();
+	submat.push_back();
+	submat.push_back();
+	submat.push_back();
+	submat.push_back();
+	submat.push_back();
+	submat.push_back();
+	submat.push_back();
+	submat.push_back();
+	submat.push_back();
+	submat.push_back();
+	
 
 	return submat;
 }
@@ -903,6 +930,25 @@ Track* MassConstraintFitter::constructTrack(TLorentzVector fitp, Track* meast){
 
 	return fitt;
 }
+std::vector<double> MassConstraintFitter::buildTrackVector(Track* t){
+
+	std::vector<double> tvect;
+	tvect.push_back(t->getD0());
+	tvect.push_back(t->getPhi());
+	tvect.push_back(t->getOmega());
+	tvect.push_back(t->getZ0());
+	tvect.push_back(t->getTanLambda());
+	return tvect;
+}
+std::vector<double> MassConstraintFitter::buildFitTrackVector(TrackParticleFitObject* tfo){
+	std::vector<double> tvect;
+	// 6 parameters d0 phi omega z0 tanL sStart/sEnd
+
+	for(int i=0; i<6; i++){
+		tvect.push_back(tfo->getParam(i));
+	}
+	return tvect;
+}
 //===================================================================================
 void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recparcol) {
 
@@ -1051,14 +1097,17 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	//build up fit data structures TLVs first
 	
 	//neutral
-	TLorentzVector temp;f:
+	TLorentzVector temp;
 	for(int i=0; i<neutralJets.size() ; i++){
 		temp.SetPxPyPzE(neutralJets.at(i)->getPx(),neutralJets.at(i)->getPy(), neutralJets.at(i)->getPz(), neutralJets.at(i)->getE());
 		fitNeutral.push_back(temp);
 	}
 	for(int i=0; i<chargedFO.size() ; i++){
-		temp.SetPxPyPzE(trackFO.at(i)->getPx(), chargedFO.at(i)->getPy(), chargedFO.at(i)->getPz(), chargedFO.at(i)->getE());
+		temp.SetPxPyPzE(trackFO.at(i)->getPx(), TrackFO.at(i)->getPy(), TrackFO.at(i)->getPz(), TrackFO.at(i)->getE());
+		
 		fitCharged.push_back(temp);
+		fitTrack.push_back(buildFitTrackVector(TrackFO.at(i));
+		
 	}
 	for(int i=0; i<fitNeutral.size(); i++){
 		fitParent += fitNeutral.at(i);	
@@ -1073,12 +1122,13 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	//sets an array of charged and neutral errors arrays from cov
 	setFitErrors(cov, cov_dim);
 	std::vector<ReconstructedParticle*> recoNeutraltemp; // be safe and clear these at the end
-	std::vector<Track*> recoTracktemp;
+	//std::vector<Track*> recoTracktemp;
 	//put candidates into local LorentzVector for ease of coding and readability
 	//do TLVs first then make new RecoParts to get generate errors
 	for(int i=0; i<bestCandidatesCharged.size(); i++){
 		measCharged.push_back( ptrack.at(bestCandidatesCharged[i]));
-		recoTracktemp.push_back(pTrackVec.at(bestCandidatesCharged[i]));
+		measTrack.push_back( pTrackVec.at(bestCandidatesCharged[i]));
+		//recoTracktemp.push_back(pTrackVec.at(bestCandidatesCharged[i]));
 	}
 	for(int i=0; i<bestCandidatesNeutral.size(); i++){
 		measNeutral.push_back( pneutral.at(bestCandidatesNeutral[i]));
@@ -1101,7 +1151,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	double * mcov = ConstructParentMeasCovMatrix();
 
 	//populate measured  parent errors from covariance matrix
-	FloatVec fitParentCov =  ConstructCovMatrix(fitCharged,fitNeutral,cov);  
+	FloatVec fitParentCov =  ConstructCovMatrix(fitTrack,fitNeutral,cov);  
 	FloatVec measParentCov = ConstructCovMatrix(measCharged,measNeutral,mcov);
 	setParentErrors(measParentCov, fitParentCov);
 	
