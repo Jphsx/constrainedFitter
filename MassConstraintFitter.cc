@@ -784,17 +784,31 @@ std::vector<double> MassConstraintFitter::ConstructNeutralSubMatrix(TLorentzVect
 double* MassConstraintFitter::ConcatSubMatrices(std::vector<std::vector<double> > matrices,  ){
 	//this is the correctly arranged jacobian made in a vector and then copied to the desired type double*
 	std::vector<double> jacobian;
-	int counter=0;//counter tracks array position every 3rd element in a submatrix is a new row
-	int stop=counter+3;
-	for(int i =0; i<matrices.size(); i++){
-		for( int j=counter; j<stop; j++){
-			jacobian.push_back(matrices.at(i).at(j));	
+	std::vector<std::vector<double>::iterator> its;
+	for(int i=0; i<matrices.size(); i++){
+		std::vector<double>::iterator it = matrices.at(i).begin();
+		its.push_back(it);
+	}
+	
+	while(its.at(_nCharged+_nNeutral-1) != matrices.at(_nCharged+_n_Neutral-1).end()){
+
+		for(int i=0; i<_nCharged; i++){
+			if(its.at(i) <= matrices.at(i).end()){
+				jacobian.insert(jacobian.end(), its.at(i), its.at(i)+6);
+				its.at(i) = its.at(i) + 6;
+			}
 		}
-		counter = stop;
-		stop = stop+3;
+		for(int i=0; i<_nNeutral; i++){
+			if(its.at(i) <= matices.at(i).end()){
+				jacobian.insert(jacobian.end(), its.at(i), its.at(i)+3);
+				its.at(i) = its.at(i) + 3;
+			}
+		}
+
 	}
 
-	//copy to double* because thats efficient :)
+	
+	//copy to double* because thats efficient ;)
 	double* jacobian2 = new double[jacobian.size()];
 	for(int i=0; i<jacobian.size(); i++){
 		jacobian2[i] = jacobian.at(i);
@@ -814,7 +828,7 @@ FloatVec MassConstraintFitter::ConstructCovMatrix(std::vector<TLorentzVector> ch
       //  Follow for now implementation in FourMomentumCovMat based on TMatrixD
 
       // Note some cases of cov_dim != 6 have been seen ...
-             const int nrows  = 3*(_nCharged+_nNeutral);  
+             const int nrows  = (6*_nCharged+3*_nNeutral);  
              const int ncolumns  =4; 
 
 
@@ -1406,10 +1420,19 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 				//int mcp1index = getCorrespondingMCParticleIndex(p1meas, 1, _daughterPID);
 				//int mcp2index = getCorrespondingMCParticleIndex(p2meas, -1, -_daughterPID);
 				//int mcpgindex = getCorrespondingMCParticleIndex(gammameas, 0,_neutralPID);
-			//these pulls can be made and valid only when each particle has a MC match
+			//these pulls can be made and valid only when each pgetCorrespondingMCParticleIndexarticle has a MC match
+				std::vector<int> neutralMCPIndices;
+				std::vector<int> chargedMCPIndices;
+
+				for(int i=0; i<fitCharged.size(); i++){
+					chargedMCPIndices.push_back(getCorrespondingMCParticleIndex(fitCharged.at(i)) );
+				}
+				for(int i=0; i<fitNeutral.size(); i++){
+					neutralMCPIndices.push_back(getCorrespondingMCParticleIndex(fitNeutral.at(i)) );
+				}
 				
 				
-				if(mcp1index != -1 && mcp2index != -1 && mcpgindex !=-1){
+				/*if(mcp1index != -1 && mcp2index != -1 && mcpgindex !=-1){
 					 mcp1.SetPxPyPzE(_mcpartvec[mcp1index]->getMomentum()[0],
 						_mcpartvec[mcp1index]->getMomentum()[1],
 						_mcpartvec[mcp1index]->getMomentum()[2],
@@ -1422,8 +1445,49 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 						_mcpartvec[mcpgindex]->getMomentum()[1],
 						_mcpartvec[mcpgindex]->getMomentum()[2],
 						_mcpartvec[mcpgindex]->getEnergy());
+				*/
+			//build up mcp 4vetors
+				for(int i=0; i< chargedMCPIndices.size(); i++){
+					TLorentzvector mcp;
+					if( chargedMCPIndices.at(i) != -1){
+						
+						mcp.SetPxPyPzE(_mcpartvec[chargedMCPIndices.at(i)]->getMomentum()[0],
+						_mcpartvec[chargedMCPIndices.at(i)]->getMomentum()[1],
+						_mcpartvec[chargedMCPIndices.at(i)]->getMomentum()[2],
+						_mcpartvec[chargedMCPIndices.at(i)]->getEnergy());
+					}
+					else{
+						mcp.SetPxPyPzE(0,0,0,0);
+					}
+					mcCharged.push_back(mcp);
 
-					P1_k_MeasGen_pull = (1/p1meas.Perp() -  1/mcp1.Perp())/ p1meas_err[0]; 
+				}
+				for(int i=0; i< neutralMCPIndices.size(); i++){
+					TLorentzVector mcp;
+					if( neutralMCPIndices.at(i) != -1){
+						mcp.SetPxPyPzE(_mcpartvec[neutralMCPIndices.at(i)]->getMomentum()[0],
+						_mcpartvec[neutralMCPIndices.at(i)]->getMomentum()[1],
+						_mcpartvec[neutralMCPIndices.at(i)]->getMomentum()[2],
+						_mcpartvec[neutralMCPIndices.at(i)]->getEnergy());
+					}
+					else{
+						mcp.SetPxPyPzE(0,0,0,0);
+					}
+					mcNeutral.push_back(mcp);
+					
+				}
+				//all MCP pulls are going to be 3 parameters E theta phi
+
+				//measgen charged
+				//vector<double> temp;
+				//for(int i=0; i<measNeutral.size(); i++){
+				//	temp.pushback(measNeutral );
+	
+				//}
+
+				
+
+				/*	P1_k_MeasGen_pull = (1/p1meas.Perp() -  1/mcp1.Perp())/ p1meas_err[0]; 
   					P1_Theta_MeasGen_pull = ( p1meas.Theta() - mcp1.Theta())/ p1meas_err[1];
 		  			P1_Phi_MeasGen_pull = getPhiResidual(p1meas.Phi(), mcp1.Phi())/p1meas_err[2] ;
 	
@@ -1450,7 +1514,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 
   					Gamma_E_FitGen_pull = (gammaFit.E() - mcgamma.E())/ std::sqrt(cov[60]);
 		  			Gamma_Theta_FitGen_pull = (gammaFit.Theta() - mcgamma.Theta())/ std::sqrt(cov[70]);
-					Gamma_Phi_FitGen_pull = getPhiResidual(gammaFit.Phi(), mcgamma.Phi()) / std::sqrt(cov[80]);			
+					Gamma_Phi_FitGen_pull = getPhiResidual(gammaFit.Phi(), mcgamma.Phi()) / std::sqrt(cov[80]);	*/		
 
 
 /*					if(fabs(Gamma_Phi_FitGen_pull)> 100 ||fabs( P2_Phi_FitGen_pull) > 100 || fabs(P1_Phi_FitGen_pull) >100){
@@ -1474,24 +1538,24 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
      
 	tree->Fill();
 	//memory management
-	pgamma.clear();
-	pplus.clear();
-	pminus.clear();
-	pGammaPfoVec.clear();
-	pPlusTrackVec.clear();
-	pMinusTrackVec.clear();
+	pneutral.clear();
+	ptrack.clear();
+	//pminus.clear();
+	pNeutralVec.clear();
+	pTrackVec.clear();
+	//pMinusTrackVec.clear();
 	
-	p1meas_err.clear();
-	p2meas_err.clear();
-	gammameas_err.clear();
+	//p1meas_err.clear();
+	measCharged_err.clear();
+	measNeutral_err.clear();
 	parentmeas_err.clear();
 
-	p1fit_err.clear();
+	fitCharged_err.clear();
 	p2fit_err.clear();
 	gammafit_err.clear();
 	parentfit_err.clear();
 
-	gammagen_err.clear();
+	//gammagen_err.clear();
 	delete gammaJet;
   	delete part1;
   	delete part2;

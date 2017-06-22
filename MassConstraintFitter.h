@@ -131,8 +131,8 @@ class DiTrackGammaCandidateFinder : public marlin::Processor {
   vector<TLorentzVector> genNeutral;
   vector<TLorentzVector> genCharged;
 
-	//vector<double>? (E || k, Theta, Phi); pull order
-  vector<vector<double> > measgen_NeutralPulls;
+	//vector<double>? (E , Theta, Phi); pull order even for charged particles
+  vector<vector<double> > measgen_NeutralPulls;  
   vector<vector<double> > measgen_ChargedPulls;
   vector<vector<double> > fitgen_NeutralPulls;
   vector<vector<double> > fitgen_ChargedPulls;
