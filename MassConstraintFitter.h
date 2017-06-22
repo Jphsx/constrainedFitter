@@ -100,8 +100,10 @@ class DiTrackGammaCandidateFinder : public marlin::Processor {
 //add variables
   vector<TLorentzVector> measNeutral;
   vector<TLorentzVector> measCharged;
+  vector<vector<double> > measTrack;
   vector<TLorentzVector> fitNeutral;
   vector<TLorentzVector> fitCharged;
+  vector<vector<double> > fitTrack;
 
   vector<vector<double> > measNeutral_err;
   vector<vector<double> > measCharged_err;
@@ -139,6 +141,10 @@ class DiTrackGammaCandidateFinder : public marlin::Processor {
 
   vector<double> genNeutralPdg;
   vector<double> genChargedPdg;
+
+  vector<vector<double> > mcTrack;//not implemented yet
+  vector<TLorentzVector> mcCharged;
+  vector<TLorentzVector> mcNeutral;
 
 
   
