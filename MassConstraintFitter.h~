@@ -11,7 +11,8 @@
 #include "TLorentzVector.h"
 typedef CLHEP::HepLorentzVector LorentzVector ;
 
-#include "LeptonFitObject.h"
+//#include "LeptonFitObject.h"
+#include "TrackParticleFitObject.h"
 #include "JetFitObject.h"
 #include "OPALFitterGSL.h"
 #include "NewFitterGSL.h"
@@ -99,8 +100,10 @@ class DiTrackGammaCandidateFinder : public marlin::Processor {
 //add variables
   vector<TLorentzVector> measNeutral;
   vector<TLorentzVector> measCharged;
+  vector<vector<double> > measTrack;
   vector<TLorentzVector> fitNeutral;
   vector<TLorentzVector> fitCharged;
+  vector<vector<double> > fitTrack;
 
   vector<vector<double> > measNeutral_err;
   vector<vector<double> > measCharged_err;
@@ -139,6 +142,10 @@ class DiTrackGammaCandidateFinder : public marlin::Processor {
   vector<double> genNeutralPdg;
   vector<double> genChargedPdg;
 
+  vector<vector<double> > mcTrack;//not implemented yet
+  vector<TLorentzVector> mcCharged;
+  vector<TLorentzVector> mcNeutral;
+
 
   
 private:
@@ -166,7 +173,8 @@ private:
 
   //LeptonFitObject* part1;
  // LeptonFitObject* part2;
-  std::vector<LeptonFitObject*> chargedFO; 
+//  std::vector<LeptonFitObject*> chargedFO; 
+    std::vector<TrackParticleFitObject*> TrackFO;
 //  OPALFitterGSL* fitter;
     BaseFitter* ftest;
 
