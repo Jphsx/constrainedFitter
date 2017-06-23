@@ -60,22 +60,33 @@ class DiTrackGammaCandidateFinder : public marlin::Processor {
   bool FindTracks( LCEvent* evt );
   bool FindMCParticles( LCEvent* evt);
   
-  int getCorrespondingMCParticleIndex(TLorentzVector vReco, int recoCharge, int recoPdg);
+
+  int getCorrespondingMCParticleIndex(TLorentzVector rec);
   void FindDiTrackGammaCandidates( LCCollectionVec* recparcol);
-// BaseFitter* setUpFit(TLorentzVector gamma, TLorentzVector p1, TLorentzVector p2, Track* p1Track, Track* p2Track );
-  OPALFitterGSL* setUpFit(TLorentzVector gamma, TLorentzVector p1, TLorentzVector p2, Track* p1Track, Track* p2Track);
+
+   OPALFitterGSL* setUPFit(vector<int> neutralIndices, vector<int> chargedIndices, vector<TLorentzVector> pneutral, vector<TLorentzVector> ptrack, vector<ReconstructedParticle*> pNeutralVec, vector<Track*> pTrackVec);
   std::vector<double> getChargedParticleErrors(TLorentzVector pcharged, Track* ptrk);
-  void calibratePhoton(TLorentzVector& v);
-  void calibratePionError(std::vector<double>& errors);
-  std::vector<double> getPhotonErrors(TLorentzVector pgamma);
-  double getPhiResidual(double phi1, double phi2);
+  std::vector<double> getNeutralErrors(TLorentzVector pneutral, ReconstructedParticle* pNeutral);
+
   void PrintCov(FloatVec cov, int dim);
   void PrintCov(double* cov, int dim);
   void setFitErrors(double* cov);
   double* ConstructParentMeasCovMatrix();
+  std::vector<double> ConstructChargedSubMatrix(std::vector<double> p, TLorentzVector ptlv);
+  std::vector<double> ConstructNeutralSubMatrix(TLorenztVector p);
+  double* ConcatSubMatrices(std::vector<std::vector<double> > matrices);
   void setParentErrors(FloatVec meascov, FloatVec fitcov);
-//transforms 9x9 to 4x4
-  FloatVec ConstructCovMatrix(TLorentzVector p1, TLorentzVector p2, TLorentzVector p3, double* cov);
+  void generateSubsets(std::vector<int> v, int k, int start, int currLen, std::vector<bool> used, std::vector<vector<int> >& combinations);
+  
+	std::vector<std::vector<int> > generateIndicesCombinations(int vectorsize, int nparticles);
+
+	ReconstructedParticleImpl* constructFitParticle(TLorentzVector fitp, ReconstructedParticle* measrp);
+
+  Track* constructTrack(TLorentzVector fitp, Track* meast);
+  std::vector<double> buildTrackVector(Track* t);
+  std::vector<double> buildFitTrackVector(TrackParticleFitObject* tfo);
+
+  FloatVec ConstructCovMatrix(std::vector<TLorentzVector> charged, std::vector<TLorentzVector> neutral, double* cov);
 
 //TTree stuff for fit analysis
   TFile *rootFile;

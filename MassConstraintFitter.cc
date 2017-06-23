@@ -375,107 +375,7 @@ bool MassConstraintFitter::FindMCParticles( LCEvent* evt ){
 
   return tf;
 }
-//===================================================================================
-//this function adjusts phi from [-pi,pi] -> [0,2pi] and returns the difference between the two arguments
-double MassConstraintFitter::getPhiResidual(double phi1, double phi2){
-	//since phi goes -pi,pi a method for finding this quantity is useful
-	//always have input phi1 - phi2
-	double residual= 0.0;
-	double phi_1=0.0;
-	double phi_2=0.0;
 
-	phi1 < 0 ? phi_1 = 2*M_PI+phi1 : phi_1=phi1;
-	phi2 < 0 ? phi_2 = 2*M_PI+phi2 : phi_2=phi2;
-
-	residual = phi_1 - phi_2;
-	if(fabs(residual) > M_PI && residual > 0.0) residual =residual - 2*M_PI;
-	if(fabs(residual) > M_PI && residual < 0.0) residual = 2*M_PI + residual;
-	return residual;
-}
-//===================================================================================
-//this function expects a global MCParticle vector of all the MCParticles from the current event, the index returned corresponds to that global MCparticle vector
-//in the future a better implementation might return  MCParticle* instead, not sure which would be more versatile
-/*int MassConstraintFitter::getCorrespondingMCParticleIndex(TLorentzVector vReco, int recoCharge, int recoPdg){
-//note so pdgs may be mixed up because +pdgcode implied +charge, which isnt true for elctron, so disabled pdg matching and just used E,theta,phi
-//it would be better in the future to look at signed curvature as a matching condition	
-	//each vector index holds a score which is the sum of residuals of the MCparticle @ index i with vReco
-	//returns the lowest score, which is the most closely matching index of score and of MCparticle
-	//generate score based on (E,theta,phi), (k,theta,phi)
-	
-	//when searcing for the particle, store the best matching particle, its score, 
-	//and index
-	//also (temporary) look at distance from interaction point, all events considered
-	//are created at interaction point
-	TLorentzVector lowestMCvec;
-	double pScore= 0.0;
-	double lowestScore = -1;
-	double lowestIndex = -1;
-	double lowestMCdistance = -1;
-	double MCDistanceFromIP = -1;
-
-	double _mcDelta;
-        //mc delta is a % (fractional error) based on the sum of fractional errors between the parameters (E,theta,phi)
-        //the % error is different for charged and neutral particles
-	if(recoPdg == 22){
-		_mcDelta = _mcDeltaGamma;
-	}
-	else{
-		_mcDelta = _mcDeltaCharged;
-	}
-	//iterate through the list of mc particles for this event, calculate scores, and find the best match
-	for(unsigned int i=0; i<_mcpartvec.size(); i++){ 
-		//match charge and pdg
-	//	if((int)_mcpartvec[i]->getCharge()==recoCharge && _mcpartvec[i]->getPDG() == recoPdg ){
-		if(_mcpartvec[i]->getPDG() == recoPdg ){
-			MCDistanceFromIP = std::sqrt(_mcpartvec[i]->getVertex()[0]*_mcpartvec[i]->getVertex()[0] + _mcpartvec[i]->getVertex()[1]*_mcpartvec[i]->getVertex()[1] + _mcpartvec[i]->getVertex()[2]*_mcpartvec[i]->getVertex()[2]  );
-			//check vertex cut
-			if(MCDistanceFromIP <= _mcVertex){
-				//normalize all scores
-				TLorentzVector mcp(_mcpartvec[i]->getMomentum()[0], _mcpartvec[i]->getMomentum()[1], _mcpartvec[i]->getMomentum()[2], _mcpartvec[i]->getEnergy());
-				//add energy pointes to score
-				//try not considering E for score with photons because of sqrt(E) error scaling
-				if(recoPdg != 22){
-				pScore += fabs(mcp.E()-vReco.E())/mcp.E();
-				}
-				//add theta points to score
-				pScore += fabs(mcp.Theta()-vReco.Theta())/mcp.Theta();
-
-				//add phi points to score
-				if(mcp.Phi()>=0){ //phi goes from -pi to pi so extra helper functions are added for phi residuals and 2pi is added where necessary
-					pScore += fabs( getPhiResidual(mcp.Phi(), vReco.Phi())) / mcp.Phi();
-				} 
-				else{
-					pScore += fabs( getPhiResidual(mcp.Phi(), vReco.Phi()))/ (2*M_PI + mcp.Phi());
-				}
-				//if this particle is the best match and passes the cuts update it as the closest match
-				if( (lowestScore == -1 && (pScore < _mcDelta)) || ((pScore < lowestScore) && lowestScore <_mcDelta) ){
-					lowestMCvec = mcp;
-					lowestScore = pScore;
-					lowestIndex = i;
-					lowestMCdistance = MCDistanceFromIP;
-				}
-			}		
-		}
-	}
-	//if a particle was matched print relevant information about the matching
-	if(lowestIndex != -1){
-        	if(_printing>3){
-			std::cout<<"MC Match: "<<std::endl;
-			std::cout<<"Reco (E,theta,phi, Charge) "<<vReco.E()<<", "<<vReco.Theta()<<", "<<vReco.Phi()<<" "<<recoCharge<<std::endl;
-			std::cout<<"MC   (E,theta,phi, Charge) "<<lowestMCvec.E()<<", "<<lowestMCvec.Theta()<<", "<<lowestMCvec.Phi()<<" "<<_mcpartvec[lowestIndex]->getCharge() <<std::endl;
-			std::cout<<"MC Distance from IP "<<lowestMCdistance<<std::endl;
-			std::cout<<"Match Fractional Error "<< lowestScore <<std::endl;
-		}
-	}
-	else{
-		if(_printing>3){
-		std::cout<<"Particle not matched "<<std::endl;
-		std::cout<<"Reco (E,theta,phi) Charge "<<vReco.E()<<", "<<vReco.Theta()<<", "<<vReco.Phi()<<" "<<recoCharge<<std::endl;
-		}
-	}
-	return lowestIndex;
-	
-}*/
 int MassConstraintFitter::getCorrespondingMCParticleIndex(TLorentzVector rec){
 	 if(_mcpartvec.size() > 1) return -1 ;
         if(_mcpartvec.size() == 0) return -1;
@@ -487,7 +387,7 @@ int MassConstraintFitter::getCorrespondingMCParticleIndex(TLorentzVector rec){
         double tempresidual2=-1;
         double tempresidual3=0;//was going to be residual for energy but dont include because no distinguishing between neutral and charged particles
        TLorentzVector mc;
-       // mc.SetPxPyPzE(_mcpartvec[0]->getMomentum()[0],_mcpartvec[0]->getMomentum()[1],_mcpartvec[0]->getMomentum()[2],_mcpartvec[0]->getEnergy());
+      
         for(int i=0; i<_mcpartvec.size(); i++){
                 //compare angles
                 mc.SetPxPyPzE(_mcpartvec[i]->getMomentum()[0],_mcpartvec[i]->getMomentum()[1],_mcpartvec[i]->getMomentum()[2],_mcpartvec[i]->getEnergy());
@@ -527,18 +427,7 @@ int MassConstraintFitter::getCorrespondingMCParticleIndex(TLorentzVector rec){
         return closest_match_index;
 
 }
-//adjusts photon energy
-/*void MassConstraintFitter::calibratePhoton(TLorentzVector& v){
-	//reconstruction sets photon energy too high, reduce by 10%
-	double cFactor =0.91;
-	v.SetPxPyPzE(cFactor*v.Px(),cFactor*v.Py(),cFactor*v.Pz(),cFactor*v.E());
-}
-//adjusts the curvature errors
-void MassConstraintFitter::calibratePionError(std::vector<double>& errors){
-	//track curvature errors are 30% too low
-	double cFactor = 0.285;
-	errors[0] = errors[0]+cFactor*errors[0];	
-}*/
+
 //===================================================================================
 //returns error array with parameterization {dE, dTheta, dPhi}
 //error for photon energy is sigma/E = 0.18/sqrt(E)
@@ -565,11 +454,6 @@ std::vector<double> MassConstraintFitter::getNeutralErrors(TLorentzVector pneutr
 //errors come from track record with (d0,z0,omega,tanLambda,theta, lamda)
 std::vector<double> MassConstraintFitter::getChargedParticleErrors(TLorentzVector pcharged, Track* ptrk){
 	std::vector<double> errors; 
-		//dk = 1/pt*dOmega/Omega 
-	//errors.push_back( fabs( 1/pcharged.Perp()*(std::sqrt(ptrk->getCovMatrix()[5])/ptrk->getOmega()) ) );
-		//dTheta=cos^2(lamda)*dtanLamda
-	//errors.push_back( std::sqrt(ptrk->getCovMatrix()[14])/(ptrk->getTanLambda()*ptrk->getTanLambda() + 1) );
-	//errors.push_back( std::sqrt(ptrk->getCovMatrix()[2]) );
 
 	errors.push_back(std::sqrt(ptrk->getCovMatrix()[0];//d0
 	errors.push_back(std::sqrt(ptrk->getCovMatrix()[5];//phi
@@ -610,7 +494,7 @@ void MassConstraintFitter::PrintCov(double* cov, int dim){
 //*updated now takes in cov, and based on #of particles/neutrals/charged builds the error data structures for fit particles
 //it goes charged and then neutrals
 void MassConstraintFitter::setFitErrors(double* cov, int dim){
-
+//using the big fit cov matrix, extract the diagonall and put the fit errors onto global vectors
 	//diagonals are every 10 indices so add 10
 	std::vector<double> temp_err;
 	int chargeCounter=0;
@@ -637,9 +521,7 @@ void MassConstraintFitter::setFitErrors(double* cov, int dim){
 double* MassConstraintFitter::ConstructParentMeasCovMatrix(){
 //concat vectors	
 	std::vector<double> params;  //THIS may be missing START/END param
-	//params.insert(params.end(), p1meas_err.begin(), p1meas_err.end());
-	//params.insert(params.end(), p2meas_err.begin(), p2meas_err.end());
-	//params.insert(params.end(), gammameas_err.begin(), gammameas_err.end());
+
 	for(int i=0; i< measCharged_err.size(); i++){
 		params.insert(params.end(), measCharged_err.at(i).begin(), measCharged_err.at(i).end());
 	}
@@ -674,38 +556,21 @@ return meascov;
 //convention is [dPx, dPy, dPz, dE]
 void MassConstraintFitter::setParentErrors(FloatVec meascov, FloatVec fitcov){
 
-	parentmeas_err.push_back( std::sqrt(meascov[0]) );
-	parentmeas_err.push_back( std::sqrt(meascov[5]) );
-	parentmeas_err.push_back( std::sqrt(meascov[10]) );
-	parentmeas_err.push_back( std::sqrt(meascov[15]) );
+	measparent_err.push_back( std::sqrt(meascov[0]) );
+	measparent_err.push_back( std::sqrt(meascov[5]) );
+	measparent_err.push_back( std::sqrt(meascov[10]) );
+	measparent_err.push_back( std::sqrt(meascov[15]) );
 	
-	parentfit_err.push_back( std::sqrt(fitcov[0]) );
-	parentfit_err.push_back( std::sqrt(fitcov[5]) );
-	parentfit_err.push_back( std::sqrt(fitcov[10]) );
-	parentfit_err.push_back( std::sqrt(fitcov[15]) );
+	fitparent_err.push_back( std::sqrt(fitcov[0]) );
+	fitparent_err.push_back( std::sqrt(fitcov[5]) );
+	fitparent_err.push_back( std::sqrt(fitcov[10]) );
+	fitparent_err.push_back( std::sqrt(fitcov[15]) );
 }
 //input 6 parameter track stuff
-std::vector<double> MassConstraintFitter::ConsructChargedSubMatrix(std::vector<double> p, TLorentzVector ptlv){
+std::vector<double> MassConstraintFitter::ConstructChargedSubMatrix(std::vector<double> p, TLorentzVector ptlv){
 	std::vector<double> submat;
 	//submatrix jacobian is this (derivatives of parent wrt to charged parameter
-	/* 
-	   dPx/dk dPx/dtheta dPx/dphi
-	   dPy/dk dPy/dtheta dPy/dphi
-	   dPz/dk dPz/dtheta dPz/dphi
-	   dE/dk dE/dtheta dE/dphi
-	*/
-	/*submat.push_back(-p.Perp() *  p.Px());
-	submat.push_back(p.Pz()*p.Px()/p.Perp());
-	submat.push_back(-p.Py());
-	submat.push_back(-p.Perp() * p.Py());
-	submat.push_back(p.Pz()*p.Py()/p.Perp());
-	submat.push_back(p.Px());
-	submat.push_back(-p.Perp()*p.P());
-	submat.push_back(-p.Perp());
-	submat.push_back(0.0);
-	submat.push_back(1.0);
-	submat.push_back(0.0);
-	submat.push_back(0.0);*/
+
 
 	/*  
 		dpx/dd0 dpx/dphi dpx/dome dpx/dz0 dpx/dtanl dpx/dstart
@@ -747,7 +612,7 @@ std::vector<double> MassConstraintFitter::ConsructChargedSubMatrix(std::vector<d
 	submat.push_back(0);//dpz/dstart
 	submat.push_back(0);//de/dd0
 	submat.push_back(0);//de/dphi
-	submat.push_back(0);//de/dome ?? is this right ??
+	submat.push_back(0);//de/dome ?? is this right ?? probably not
 	submat.push_back(0);//de/dz0
 	submat.push_back(0);//de/dtanl
 	submat.push_back(0);//de/dstart
@@ -781,7 +646,7 @@ std::vector<double> MassConstraintFitter::ConstructNeutralSubMatrix(TLorentzVect
 	return submat;
 	
 }
-double* MassConstraintFitter::ConcatSubMatrices(std::vector<std::vector<double> > matrices,  ){
+double* MassConstraintFitter::ConcatSubMatrices(std::vector<std::vector<double> > matrices ){
 	//this is the correctly arranged jacobian made in a vector and then copied to the desired type double*
 	std::vector<double> jacobian;
 	std::vector<std::vector<double>::iterator> its;
@@ -1540,25 +1405,29 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	//memory management
 	pneutral.clear();
 	ptrack.clear();
-	//pminus.clear();
 	pNeutralVec.clear();
 	pTrackVec.clear();
-	//pMinusTrackVec.clear();
+
+	measNeutral.clear();
+	measCharged.clear();
+	mesaTrack.clear();
+	fitNeutral.clear();
+	fitCharged.clear();
+	fitTrack.clear();
 	
-	//p1meas_err.clear();
 	measCharged_err.clear();
 	measNeutral_err.clear();
 	parentmeas_err.clear();
 
 	fitCharged_err.clear();
-	p2fit_err.clear();
-	gammafit_err.clear();
-	parentfit_err.clear();
+	fitNeutral_err.clear();
+	
+	measParent_err.clear();
+	fitParent_err.clear();
 
 	//gammagen_err.clear();
-	delete gammaJet;
-  	delete part1;
-  	delete part2;
+		neutralJets.clear();
+		TrackFO.clear();
 	delete fitter;
     }//end pvector size check
 	//track events for each call
