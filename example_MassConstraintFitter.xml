@@ -10,19 +10,19 @@
 
 <marlin>
  <execute>
-   <processor name="MyMCParticleFilter" />
-   <processor name="MyDiTrackGammaFinder"/>  
+   <processor name="MyMCParticleFilter" /> 
+   <processor name="MyMassConstraintFitter"/>  
    <processor name="MyLCIOOutputProcessor"/>
  </execute>
 
  <global>
-   <parameter name="LCIOInputFiles"> Eta_20GeV_Decay3_10k_REC.slcio </parameter>
+  <!-- <parameter name="LCIOInputFiles"> Eta_20GeV_Decay3_10k_REC.slcio </parameter> -->
   <!-- test indicates newest version of simulation -->
- <!--  <parameter name="LCIOInputFiles"> Eta_20GeV_Decay3_10k_test_REC.slcio </parameter> -->
+   <parameter name="LCIOInputFiles"> ../slciofiles/Eta_20GeV_Decay3_10k_test_REC.slcio </parameter> 
    <parameter name="SkipNEvents" value="0" />
-   <parameter name="MaxRecordNumber" value="0" /> <!-- 0 is all events -->
+   <parameter name="MaxRecordNumber" value="3" /> <!-- 0 is all events -->
    <parameter name="SupressCheck" value="false" />
-   <parameter name="GearXMLFile" value="gear_ILD_o1_v05_dd4hep.xml" />
+   <parameter name="GearXMLFile" value="gear_ILD_l1_v01_dd4hep.xml" />
    <parameter name="Verbosity" options="DEBUG0-4,MESSAGE0-4,WARNING0-4,ERROR0-4,SILENT"> DEBUG </parameter>
  </global>
 
@@ -30,34 +30,33 @@
   <parameter name="MCParticlesCollection" type="string" lcioInType="MCParticle"> MCParticle </parameter>
   <parameter name="OutputParticleCollectionName" value="MCDecayParticles" />
   <parameter name="Printing" value="5" />
- </processor>
+ </processor> 
 
- <processor name="MyDiTrackGammaFinder" type="DiTrackGammaCandidateFinder">
-    <parameter name="InputTrackCollectionName" value="MarlinTrkTracks" />
-   <!-- <parameter name="MCParticleCollection" type="string" lcioInType="MCParticle"> MCParticle </parameter> -->
+ <processor name="MyMassConstraintFitter" type="MassConstraintFitter">
+    
     <parameter name="MCDecayParticles" type="string" lcioInType="MCParticle"> MCDecayParticles </parameter>
-    <parameter name="DiTrackGammaResonanceName" value="Eta" />
-    <parameter name="DiTrackGammaResonanceMass" value="0.547862" />
-    <parameter name="MaxDeltaM" value="999" /><!-- was cuttiong on 0.07-->
-    <parameter name="GammaMomentumCut" value="0.0" />
-    <parameter name="MinPtCut" value="0" />
-    <parameter name="FitProbabilityCut" value ="0.0001" />
-   <parameter name="RootFile" value="DiTrackGammaFitAnalysis.root"/>
-   <!-- <parameter name="RootFile" value="DiTrackGammaFitAnalysisTEST.root"/> -->
-    <parameter name="DiTrackGammaResonancePID" value = "221" />
-    <parameter name="DaughterDecayPID" value = "211" />
-    <parameter name="NeutralPID" value = "22" />
-    <parameter name="DaughterDecayMass" value = ".13957018" />
-    <parameter name="FitAnalysis" value ="1"/>
-    <!-- 0 = OPALFitter, 1 = NewFitter, 2 = NewtonFitter (default: 0) -->
-    <parameter name="fitter" type="int"> 0 </parameter>
     <parameter name="Printing" value="5" />
-    <parameter name="OutputParticleCollectionName" value="DiTrackGammaCandidates" />
-    <!--cut on sum of fractional errors of (E,theta,phi) of MC particle and selected particle -->
-    <parameter name="MCDeltaCharged" value="0.20" />
-    <parameter name="MCDeltaGamma" value="0.30" />
-    <parameter name="usePhotonCalibration" value="0" />
-    <parameter name="useTrackCalibration" value="0" />
+    <parameter name="RootFile" value="MassConstraint.root" />
+    <parameter name="parentPdg" value="221" />
+    <parameter name="parentMass" value="0.547862" />
+    <parameter name="parentCharge" value="0" />
+    <parameter name="nDaughters" value="3" />
+    <parameter name="nCharged" value="2" />
+    <parameter name="nNeutral" value="1" />
+    <parameter name="daughterChargedPdgs" type="IntVec"> 211 </parameter>
+    <parameter name="daughterNeutralPdgs" type="IntVec"> 22 </parameter>
+    <parameter name="daughterChargedMass" type="FloatVec"> 0.13957018 </parameter>
+    <parameter name="daughterNeutralMass" type="FloatVec"> 0.0 </parameter>
+    <parameter name="InputParticleCollectionName" type="string" lcioInType="ReconstructedParticle" value="PandoraPFOs" />
+    <parameter name="InputTrackCollectionName" value="MarlinTrkTracks" />
+    <parameter name="MCParticlesCollection" type="string" lcioInType="MCParticle"> MCParticle </parameter>
+    <parameter name="FitProbabilityCut" value="0.0001" />
+    <parameter name="fitter" value="0" />
+    <parameter name="FitAnalysis" value="1" />
+    <parameter name="GeneratorAnalysis" value="0" />
+   
+     
+  
  </processor>
 
  <processor name="MyLCIOOutputProcessor" type="LCIOOutputProcessor">
@@ -66,7 +65,7 @@
        ./myfile_OUT.slcio
      </parameter>
      <parameter name="LCIOWriteMode" type="string" value="WRITE_NEW"/>
-     <!--parameter name="SplitFileSizekB" type="int" value="1992294"/-->
+   
  </processor>
 
 </marlin>

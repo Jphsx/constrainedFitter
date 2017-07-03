@@ -5,7 +5,7 @@
 #include "EVENT/ReconstructedParticle.h"
 #include "gear/BField.h"
 #include "IMPL/ReconstructedParticleImpl.h"
-#include "MassConstraintFitter.h"
+#include "../include/MassConstraintFitter.h"
 #include "CLHEP/Vector/LorentzVector.h"
 #include "CLHEP/Vector/ThreeVector.h"
 typedef CLHEP::HepLorentzVector LorentzVector ;
@@ -40,7 +40,7 @@ MassConstraintFitter::MassConstraintFitter() : marlin::Processor("MassConstraint
   registerProcessorParameter( "Printing" , 
 			      "Print certain messages"  ,
 			      _printing,
-			       (int)1 ) ;
+			       (int)5 );
 
   registerProcessorParameter("RootFile" ,
 			     "Name of the output root file" ,
@@ -99,7 +99,7 @@ MassConstraintFitter::MassConstraintFitter() : marlin::Processor("MassConstraint
 			      daughterChargedMass); 
 
   std::vector<float> daughterNeutralMass;
-  daughterNeutralMass.push_back("0.0");
+  daughterNeutralMass.push_back(0.0);
   registerProcessorParameter("daughterNeutralMass",
 			     "Mass [GeV] of daugher decay particles with charge == 0",
 			     _daughterNeutralMass,
@@ -194,48 +194,48 @@ void MassConstraintFitter::init() {
 	tree->Branch("Chisq", &Chisq);
 	tree->Branch("evtNo", &evtNo);
 
-	tree->Branch("measNeutral.", "vector<TLorentzVector>", &measNeutral);
-        tree->Branch("measCharged.", "vector<TLorentzVector>", &measCharged);
-	tree->Branch("measTrack.","vector<vector<double> >", &measTrack);
-        tree->Branch("fitNeutral.", "vector<TLorentzVector>", &fitNeutral);
-        tree->Branch("fitCharged.", "vector<TLorentzVector>", &fitCharged);
-	tree->Branch("fitTrack.", "vector<vector<double> >",&fitTrack);
+	tree->Branch("measNeutralVec.", &measNeutralVec);
+        tree->Branch("measChargedVec.", &measChargedVec);
+//	tree->Branch("measTrack.", &measTrack);
+        tree->Branch("fitNeutralVec.", &fitNeutralVec);
+        tree->Branch("fitChargedVec.", &fitChargedVec);
+//	tree->Branch("fitTrack.",&fitTrack);
 
-	tree->Branch("measNeutral_err.", "vector<vector<double> >", &measNeutral_err);
-	tree->Branch("measCharged_err.", "vector<vector<double> >", &measCharged_err);
-	tree->Branch("measTrack_err.","vector<vector<double> >",&measTrack_err);
-	tree->Branch("fitNeutral_err.", "vector<vector<double> >", &fitNeutral_err);
-	tree->Branch("fitCharged_err.", "vector<vector<double> >", &fitCharged_err);
-	tree->Branch("fitTrack_err.", "vector<vector<double> >",&fitTrack_err);
+	tree->Branch("measNeutral_err.", &measNeutral_err);
+	tree->Branch("measCharged_err.", &measCharged_err);
+	tree->Branch("measTrack_err.",&measTrack_err);
+	tree->Branch("fitNeutral_err.", &fitNeutral_err);
+	tree->Branch("fitCharged_err.", &fitCharged_err);
+	tree->Branch("fitTrack_err.",&fitTrack_err);
 
 	tree->Branch("measNeutralPdg.", "vector<double>", &measNeutralPdg);
 	tree->Branch("measChargedPdg.", "vector<double>", &measChargedPdg);
 
-	tree->Branch("fitmeas_NeutralPulls.", "vector<vector<double> >", &fitmeas_NeutralPulls);
-	tree->Branch("fitmeas_ChargedPulls.", "vector<vector<double> >", &fitmeas_ChargedPulls);
+	tree->Branch("fitmeas_NeutralPulls.", &fitmeas_NeutralPulls);
+	tree->Branch("fitmeas_ChargedPulls.", &fitmeas_ChargedPulls);
 	
 	tree->Branch("measParent.", "TLorentzVector", &measParent);
 	tree->Branch("fitParent.", "TLorentzVector", &fitParent);
 	
 	tree->Branch("measParent_err.", "vector<double>", &measParent_err);
-	tree->Branch("fitParent_err.", "vectore<double>", &fitParent_err);
+	tree->Branch("fitParent_err.", "vector<double>", &fitParent_err);
 
-	tree->Branch("fitmeas_NeutralPulls.", "vector<vector<double> >",&fitmeas_NeutralPulls);
-	tree->Branch("fitmeas_ChargedPulls.", "vector<vector<double> >",&fitmeas_ChargedPulls);
+	tree->Branch("fitmeas_NeutralPulls.",&fitmeas_NeutralPulls);
+	tree->Branch("fitmeas_ChargedPulls.",&fitmeas_ChargedPulls);
    }
 	//////////////mc stuff
 	if(_genAnalysis){
 	tree->Branch("genNeutral.", "TLorentzVector", &genNeutral);
 	tree->Branch("genCharged.", "TLorentzVector", &genCharged);
 	
-	tree->Branch("measgen_NeutralPulls.", "vector<vector<double> >", &measgen_NeutralPulls);
-	tree->Branch("measgen_ChargedPulls.", "vector<vector<double> >", &measgen_ChargedPulls);
-	tree->Branch("fitgen_NeutralPulls.", "vector<vector<double> >" , &fitgen_NeutralPulls);
-	tree->Branch("fitgen_ChargedPulls.", "vector<vector<double> >" , &fitgen_ChargedPulls);
+	tree->Branch("measgen_NeutralPulls.", &measgen_NeutralPulls);
+	tree->Branch("measgen_ChargedPulls.", &measgen_ChargedPulls);
+	tree->Branch("fitgen_NeutralPulls.", &fitgen_NeutralPulls);
+	tree->Branch("fitgen_ChargedPulls." , &fitgen_ChargedPulls);
 
 	tree->Branch("genParent.", "TLorentzVector", &genParent);
 	
-	tree->Branch("genNeutralPdg.", "vector<double>", &genNeuralPdg);
+	tree->Branch("genNeutralPdg.", "vector<double>", &genNeutralPdg);
 	tree->Branch("genChargedPdg.", "vector<double>", &genChargedPdg);
 	
     }
@@ -280,7 +280,7 @@ void MassConstraintFitter::processEvent( LCEvent * evt ) {
   if((found && found2) || (found && found && _genAnalysis && found3)){
     if(_printing>1)std::cout << "Analysis of resonance with PDG code: " << _parentPdg << std::endl; 
     this->FindMassConstraintCandidates(recparcol);
-  }} 
+  } 
   
   
   // Add new collection to event
@@ -395,11 +395,11 @@ int MassConstraintFitter::getCorrespondingMCParticleIndex(TLorentzVector rec){
                 	if(closest_match_index==-1){
                         	closest_match_index = 0;
                         	theta_residual = abs(rec.Theta() - mc.Theta());
-                        	phi_residual = abs(getPhi(rec) - getPhi(mc));
+                        	phi_residual = abs(rec.Phi() - mc.Phi()); //currently between -pi,pi might need to change for 0,2pi
                     	//    e_residual = abs(rec.E() - mc.E());
                 	}
                 	tempresidual1 = abs(rec.Theta() - mc.Theta());
-                	tempresidual2 = abs(getPhi(rec) - getPhi(mc));
+                	tempresidual2 = abs(rec.Phi() - mc.Phi());//dont forget to change this line also
              	//   tempresidual3 = abs(rec.E() - mc.E());
                 	if((tempresidual1+tempresidual2+tempresidual3) < (theta_residual+phi_residual+e_residual) ){
                 	        closest_match_index=i;
@@ -454,12 +454,18 @@ std::vector<double> MassConstraintFitter::getNeutralErrors(TLorentzVector pneutr
 //errors come from track record with (d0,z0,omega,tanLambda,theta, lamda)
 std::vector<double> MassConstraintFitter::getChargedParticleErrors(TLorentzVector pcharged, Track* ptrk){
 	std::vector<double> errors; 
-
-	errors.push_back(std::sqrt(ptrk->getCovMatrix()[0];//d0
-	errors.push_back(std::sqrt(ptrk->getCovMatrix()[5];//phi
-	errors.push_back(std::sqrt(ptrk->getCovMatrix()[9];//ome
-	errors.push_back(std::sqrt(ptrk->getCovMatrix()[12];//z0
-	errors.push_back(std::sqrt(ptrk->getCovMatrix()[14];//tan
+//	std::cout<<"PRINTING FULL COV"<<std::endl;
+//	FloatVec cov = ptrk->getCovMatrix();
+//	for(int i=0; i<15; i++){
+//		std::cout<<cov[i]<<" ";
+//	}
+//	std::cout<<std::endl;
+//track matrix is lower diagonal
+	errors.push_back(std::sqrt(ptrk->getCovMatrix()[0]));//d0
+	errors.push_back(std::sqrt(ptrk->getCovMatrix()[2]));//phi
+	errors.push_back(std::sqrt(ptrk->getCovMatrix()[5]));//ome
+	errors.push_back(std::sqrt(ptrk->getCovMatrix()[9]));//z0
+	errors.push_back(std::sqrt(ptrk->getCovMatrix()[14]));//tan
 
 	return errors;
 }
@@ -500,8 +506,8 @@ void MassConstraintFitter::setFitErrors(double* cov, int dim){
 	int chargeCounter=0;
 	for(int i=0; i<dim*dim; i = i+10){
 		temp_err.push_back(cov[i]);
-		if( temp_err.size() == 3){
-			if(chargeCounter < chargedFO.size()){
+		if( temp_err.size() == 3){//THIS METHOD IS WRONG
+			if(chargeCounter < TrackFO.size()){
 				fitCharged_err.push_back(temp_err);
 				chargeCounter++;
 				temp_err.clear();
@@ -556,18 +562,18 @@ return meascov;
 //convention is [dPx, dPy, dPz, dE]
 void MassConstraintFitter::setParentErrors(FloatVec meascov, FloatVec fitcov){
 
-	measparent_err.push_back( std::sqrt(meascov[0]) );
-	measparent_err.push_back( std::sqrt(meascov[5]) );
-	measparent_err.push_back( std::sqrt(meascov[10]) );
-	measparent_err.push_back( std::sqrt(meascov[15]) );
+	measParent_err.push_back( std::sqrt(meascov[0]) );
+	measParent_err.push_back( std::sqrt(meascov[5]) );
+	measParent_err.push_back( std::sqrt(meascov[10]) );
+	measParent_err.push_back( std::sqrt(meascov[15]) );
 	
-	fitparent_err.push_back( std::sqrt(fitcov[0]) );
-	fitparent_err.push_back( std::sqrt(fitcov[5]) );
-	fitparent_err.push_back( std::sqrt(fitcov[10]) );
-	fitparent_err.push_back( std::sqrt(fitcov[15]) );
+	fitParent_err.push_back( std::sqrt(fitcov[0]) );
+	fitParent_err.push_back( std::sqrt(fitcov[5]) );
+	fitParent_err.push_back( std::sqrt(fitcov[10]) );
+	fitParent_err.push_back( std::sqrt(fitcov[15]) );
 }
-//input 6 parameter track stuff
-std::vector<double> MassConstraintFitter::ConstructChargedSubMatrix(std::vector<double> p, TLorentzVector ptlv){
+//input 6 parameter track stuff// p is 6 params on a vectordouble
+std::vector<double> MassConstraintFitter::ConstructChargedSubMatrix(std::vector<double> trackparams, TLorentzVector ptlv){
 	std::vector<double> submat;
 	//submatrix jacobian is this (derivatives of parent wrt to charged parameter
 
@@ -579,9 +585,9 @@ std::vector<double> MassConstraintFitter::ConstructChargedSubMatrix(std::vector<
 		de/dd0 de/dphi de/dome de/dz0 de/dtanl de/dstart
 
 	*/
-	double lambda = atan(p.at(4));
-	double phi = p.at(1);
-	double omega = p.at(2);
+	double lambda = atan(trackparams.at(4));
+	double phi = trackparams.at(1);
+	double omega = trackparams.at(2);
 	double P = ptlv.P();
 
 	const double c = 2.99792458e8; // m*s^-1
@@ -593,22 +599,22 @@ std::vector<double> MassConstraintFitter::ConstructChargedSubMatrix(std::vector<
 	
 
 	submat.push_back(0); //dpx/dd0
-	submat.push_back(P*cos(lambda)*cos(phi); //dpx/dphi ...
+	submat.push_back(P*cos(lambda)*cos(phi)); //dpx/dphi ...
  	submat.push_back(-eB*cos(phi)/(omega*omega)); //dpx/dome
 	submat.push_back(0); //dpx/dz0
-	submat.push_back(-P*cos(phi)*tan(lambda)/pow(1+(tan(lambda)*tan(lambda)),3.0/2.0); //dpx/dtanl
+	submat.push_back(-P*cos(phi)*tan(lambda)/pow(1+(tan(lambda)*tan(lambda)),3.0/2.0)); //dpx/dtanl
 	submat.push_back(0);// dpx/dstart
 	submat.push_back(0); //dpy/dd0
 	submat.push_back(P*cos(lambda)*cos(phi)); //dpy/dphi
 	submat.push_back(-eB*sin(phi)/(omega*omega)); //dpy/dome
 	submat.push_back(0);//dpy/dz0
-	submat.push_back(-P*sin(phi)*tan(lambda)/pow(1+(tan(lambda)*tan(lambda)),3.0/2.0); //dpy/dtanl
+	submat.push_back(-P*sin(phi)*tan(lambda)/pow(1+(tan(lambda)*tan(lambda)),3.0/2.0)); //dpy/dtanl
 	submat.push_back(0);//dpy/dstart
 	submat.push_back(0);//dpz/dd0'
 	submat.push_back(0);//dpz/dphi
 	submat.push_back(-eB*tan(lambda)/(omega*omega)); //dpz/dome
 	submat.push_back(0);//dpz/dz0
-	submat.push_back(1/pow(1+(tan(lambda)*tan(lambda)),3.0/2.0);//dpz/dtanl
+	submat.push_back(1/pow(1+(tan(lambda)*tan(lambda)),3.0/2.0));//dpz/dtanl
 	submat.push_back(0);//dpz/dstart
 	submat.push_back(0);//de/dd0
 	submat.push_back(0);//de/dphi
@@ -655,7 +661,7 @@ double* MassConstraintFitter::ConcatSubMatrices(std::vector<std::vector<double> 
 		its.push_back(it);
 	}
 	
-	while(its.at(_nCharged+_nNeutral-1) != matrices.at(_nCharged+_n_Neutral-1).end()){
+	while(its.at(_nCharged+_nNeutral-1) != matrices.at(_nCharged+_nNeutral-1).end()){
 
 		for(int i=0; i<_nCharged; i++){
 			if(its.at(i) <= matrices.at(i).end()){
@@ -664,7 +670,7 @@ double* MassConstraintFitter::ConcatSubMatrices(std::vector<std::vector<double> 
 			}
 		}
 		for(int i=0; i<_nNeutral; i++){
-			if(its.at(i) <= matices.at(i).end()){
+			if(its.at(i) <= matrices.at(i).end()){
 				jacobian.insert(jacobian.end(), its.at(i), its.at(i)+3);
 				its.at(i) = its.at(i) + 3;
 			}
@@ -684,7 +690,7 @@ double* MassConstraintFitter::ConcatSubMatrices(std::vector<std::vector<double> 
 }
 //===================================================================================
 //FloatVec MassConstraintFitter::ConstructCovMatrix(TLorentzVector p1, TLorentzVector p2, TLorentzVector p3, double*  cov){
-FloatVec MassConstraintFitter::ConstructCovMatrix(std::vector<TLorentzVector> charged, std::vector<TLorentzVector> neutral, double* cov){
+FloatVec MassConstraintFitter::ConstructCovMatrix(std::vector<std::vector<double> > trackparams, std::vector<TLorentzVector> charged, std::vector<TLorentzVector> neutral, double* cov){
 
       
             FloatVec covP(16,0.0);
@@ -698,18 +704,18 @@ FloatVec MassConstraintFitter::ConstructCovMatrix(std::vector<TLorentzVector> ch
 
 
 	std::vector<std::vector<double> > matrices;
-	for(int i =0; i< neutral.size(); i++){
-		matrices.push_back(ConsructChargedSubMatrix(neutral.at(i));
+	for(int i =0; i< charged.size(); i++){
+		matrices.push_back(ConstructChargedSubMatrix(trackparams.at(i), charged.at(i)));
 	}
-	for(int i= 0; i< charged.size(); i++){	
-		matrices.push_back(ConstructNeutralSubMatrix(charged.at(i));
+	for(int i= 0; i< neutral.size(); i++){	
+		matrices.push_back(ConstructNeutralSubMatrix(neutral.at(i)));
 	}
 
-	double* jacobian = ConcatSubMatrices(matrices);
+	double* jacobian = ConcatSubMatrices(matrices);//jacobian is by columns
 
 
       //  Now set up to calculate the new covariance matrix, namely  V' = D^T V D
-             TMatrixD Dmatrix(nrows,ncolumns, jacobian_by_columns, "F");
+             TMatrixD Dmatrix(nrows,ncolumns, jacobian, "F");
              TMatrixD Vmatrix(nrows,nrows, cov, "F");                      // May need to have the filling array explicitly dimensioned ??
              TMatrixD Covmatrix(ncolumns,ncolumns);                        // Hopefully this is good enough for initialization ?
 
@@ -720,7 +726,8 @@ FloatVec MassConstraintFitter::ConstructCovMatrix(std::vector<TLorentzVector> ch
         //            if(_printing>3)std::cout << "4-vector cov. " << ii << " " << jj << " " << Covmatrix(ii,jj) << " Corr: " << Covmatrix(ii,jj)/std::sqrt(Covmatrix(ii,ii)*Covmatrix(jj,jj)) << std::endl;
         		covP[index] = Covmatrix(ii,jj);
 			index++;
-                 }                  
+                 }                 
+	     } 
 
 	return covP;
 } 
@@ -728,9 +735,8 @@ FloatVec MassConstraintFitter::ConstructCovMatrix(std::vector<TLorentzVector> ch
 //Current implementation only allows one type of fitter because using the base class is not working correctly
 //BaseFitter* MassConstraintFitter::setUpFit(TLorentzVector gamma, TLorentzVector p1, TLorentzVector p2, Track* p1Track, Track* p2Track ){
 //OPALFitterGSL* MassConstraintFitter::setUpFit(TLorentzVector gamma, TLorentzVector p1, TLorentzVector p2, Track* p1Track, Track* p2Track){
-BaseFitter* MassConsraintFitter::setUpFit(vector<int> neutralIndices, vector<int> chargedIndices,
-					vector<TLorentzVector> pneutral, vector<TLorentzVector> ptrack,
-					vector<ReconstructedParticle*> pNeutralVec, vector<Track*> pTrackVec){                                       
+//OPALFitterGSL* 
+NewtonFitterGSL* MassConstraintFitter::setUpFit(std::vector<int> neutralIndices, std::vector<int> chargedIndices,std::vector<TLorentzVector> pneutral, std::vector<TLorentzVector> ptrack,std::vector<ReconstructedParticle*> pNeutralVec, std::vector<Track*> pTrackVec){                                       
 
 	//set up mass constraint
 	MassConstraint mc( (double)_parentMass );
@@ -739,24 +745,25 @@ BaseFitter* MassConsraintFitter::setUpFit(vector<int> neutralIndices, vector<int
 	std::vector<std::vector<double> > neutralErrors;
 	std::vector<std::vector<double> > chargedErrors;
 
-	
+std::cout<<"in setup "<<neutralIndices.size()<<" "<<chargedIndices.size()<<std::endl;	
 //Working here today? implement these get error functions
 	for(unsigned int i =0; i< neutralIndices.size(); i++){
-		neutralErrors.push_back(getNeutralErrors(pNeutralVec.at( neutralIndices.at(i)) ) );//should i pass recopart or tlv here?
+		neutralErrors.push_back(getNeutralErrors(pneutral.at( neutralIndices.at(i)),pNeutralVec.at( neutralIndices.at(i)) ) );//should i pass recopart or tlv here?
 	}
 	for(unsigned int i=0; i < chargedIndices.size(); i++){
-		chargedErrors.push_back(getChargedErrors(ptrack.at( chargedIndices.at(i)), pTrackVec.at( chargedIndices.at(i)) ) );
+		chargedErrors.push_back(getChargedParticleErrors(ptrack.at( chargedIndices.at(i)), pTrackVec.at( chargedIndices.at(i)) ) );
 	}
-
+//std::cout<<"did errors "<<std::endl;
 
 	//set up JetFitObjects
 	for(unsigned int i=0; i < neutralIndices.size(); i++){
 		neutralJets.push_back( new JetFitObject(pneutral.at(neutralIndices.at(i)).E(),pneutral.at(neutralIndices.at(i)).Theta(),pneutral.at(neutralIndices.at(i)).Phi(), neutralErrors.at(i)[0], neutralErrors.at(i)[1], neutralErrors.at(i)[2]));
-	}					
+	}			
+//std::cout<<"did jets "<<std::endl;		
 
 	for(unsigned int i =0; i < chargedIndices.size(); i++){
 		//chargedFO.push_back( new LeptonFitObject( 1/ptrack.at(chargedIndices.at(i)).Perp(), ptrack.at(chargedIndices.at(i)).Theta(), ptrack.at(chargedIndices.at(i)).Phi(), chargedErrors.at(i)[0], chargedErrors.at(i)[1], chargedErrors.at(i)[2]), ptrack.at(chargedIndices.at(i)).M());
-		trackFO.push_back( new TrackParticleFitObject(pTrackVec.at(chargedIndices.at(i)),ptrack.at(chargedIndices.at(i)).M()  ));
+		TrackFO.push_back( new TrackParticleFitObject(pTrackVec.at(chargedIndices.at(i)),ptrack.at(chargedIndices.at(i)).M()  ));
 	} 	
 
 
@@ -767,55 +774,84 @@ BaseFitter* MassConsraintFitter::setUpFit(vector<int> neutralIndices, vector<int
 		if(_printing>4)std::cout << "neutral "<< i <<" E, theta, phi, M, Pdg: " <<  pneutral.at(neutralIndices.at(i)).E()<< " "<< pneutral.at(neutralIndices.at(i)).Theta()<< " "<< pneutral.at(neutralIndices.at(i)).Phi()<< " "<< pneutral.at(neutralIndices.at(i)).M()<< " "<< pNeutralVec.at(neutralIndices.at(i))->getType() << std::endl;
 		if(_printing>4)std::cout << "errors "<< i <<" dE, dTheta, dPhi: " << neutralErrors.at(i)[0] << " "<< neutralErrors.at(i)[1] << " "<<neutralErrors.at(i)[2]<< std::endl;
 	}	
-	if(_prining>4)std::cout <<" Charged Particles "<<std::endl;
+	if(_printing>4)std::cout <<" Charged Particles "<<std::endl;
 	for(unsigned int i=0; i< chargedIndices.size(); i++){
-		if(_printing>4)std::cout <<"charged "<< i <<" d0, phi, omega, z0, tanL, M: "<< pTrackVec.at(i)->getD0()<<" "<<pTrackVec.at(i)->getPhi()<<" "<<pTrackVec.at(i)->getOmega()<<" "<<pTrackVec.at(i)->getZ0()<<" "<<pTrackVec.at(i)->getTanLambda()<<" "<<ptrack.at(chargedIndices.at(i)).M() << std::endl;
+		if(_printing>4)std::cout <<"charged "<< i <<" d0, phi, omega, z0, tanL, M: "<< pTrackVec.at(chargedIndices.at(i))->getD0()<<" "<<pTrackVec.at(chargedIndices.at(i))->getPhi()<<" "<<pTrackVec.at(chargedIndices.at(i))->getOmega()<<" "<<pTrackVec.at(chargedIndices.at(i))->getZ0()<<" "<<pTrackVec.at(chargedIndices.at(i))->getTanLambda()<<" "<<ptrack.at(chargedIndices.at(i)).M() << std::endl;
 		if(_printing>4)std::cout<<"errors "<< i << "dd0 dPhi ddome dz0 dtanL ";
 		for(unsigned int j=0; j<chargedErrors.at(i).size(); j++){
-			if(_printing>4)std::cout<< chargedErrors.at(j) << " ";
+			if(_printing>4)std::cout<< chargedErrors.at(i).at(j) << " ";
 		}
 		if(_printing>4) std::cout<<std::endl;
 	}
 
 
 	//clean up memory with errors that are not going to be used again in this scope
-	neutralErrors.clear();
-	chargedErrors.clear();
-					
+//	neutralErrors.clear();
+//	chargedErrors.clear();
+		
+//
+//	VertexFitObject* vertexFO = new VertexFitObject("commonVtx",0,0,0);
+     
+ //     vertexFO->setParam(0,0.,false,false); // measured=false, fixed=false
+  //    vertexFO->setParam(1,0.,false,false);
+  //    vertexFO->setParam(2,0.,false,false);
+  //    vertexFO->setError(0,100.);
+  //    vertexFO->setError(1,100.);
+  //    vertexFO->setError(2,100.);
+      
+//	for(int i=0; i<TrackFO.size(); i++){
+//		vertexFO->addTrack(TrackFO.at(i),false, true);
+//	}
+		
+
+	
 	//add fitobjects to mass constraint
-	for(unsigned int i= 0; i<chargedIndices.size(); i++){
-		mc.addtoFOList(*chargedFO[i]);
+	for(unsigned int i= 0; i<TrackFO.size(); i++){
+		mc.addToFOList(*TrackFO[i]);
 	}
-	for(unsigned int i =0; i<neutralIndices.size(); i++){
-		mc.addtoFOList(*neutralJets[i]);
+	for(unsigned int i =0; i<neutralJets.size(); i++){
+		mc.addToFOList(*neutralJets[i]);
 	}
 
+//	std::cout<<"add to mc "<<std::endl;
 	//declare fitter
 	//include options for other fitters
-	OPALFitterGSL * fitter = new OPALFitterGSL();
+//	OPALFitterGSL * 
+	NewtonFitterGSL* fitter = new NewtonFitterGSL(); //OPALFitterGSL();
 	///////////////////	
 
 	//add constraints and fit objects to fitter
-	for(unsigned int i=0; i< chargedIndices.size(); i++){
-		fiter->addFitObject( chargedFO[i] );
+	for(unsigned int i=0; i< TrackFO.size(); i++){
+		fitter->addFitObject( TrackFO[i] );
 	}
-	for(unsigned int i=0; i< neutralIndices.size(); i++){
+	for(unsigned int i=0; i< neutralJets.size(); i++){
 		fitter->addFitObject( neutralJets[i] );
 	}
+//	std::cout<<" add FO "<<std::endl;
+//		fitter->addFitObject( vertexFO );
+
+//		vertexFO->addConstraints( *fitter, int(VertexFitObject::VXYZ) );
+
+//		vertexFO->initForFit();
+		
 	//add the things, what order should i use? charged then neutral?
+
 	fitter->addConstraint(mc);
-	
+//	std::cout<<" add const "<<std::endl;	
 	//do the fit (this also returns a fit probability)
 	fitter->fit();
+//	std::cout<<" fitted "<<std::endl;
 
 	//TODO:: look up the function that returns fit prob, dont fit twice if printing	
 //	if(_printing>4)std::cout <<" Fit Probability: "<< fitter->fit()<<std::endl;
+	neutralErrors.clear();
+	chargedErrors.clear();
 
 	
 	return fitter;
 
 }
-void MassConstraintFitter::generateSubsets(std::vector<int> v, int k, int start, int currLen, std::vector<bool> used, std::vector<vector<int> >& combinations){
+void MassConstraintFitter::generateSubsets(std::vector<int> v, int k, int start, int currLen, std::vector<bool> used, std::vector<std::vector<int> >& combinations){
 	if(currLen == k) {
 		std::vector<int> indices;
 		for(unsigned int i=0; i<v.size(); i++){
@@ -830,31 +866,46 @@ void MassConstraintFitter::generateSubsets(std::vector<int> v, int k, int start,
 		return;
 	}
 	used[start] = true;
-	generateSubset(v,k,start+1,currLen+1,used, combinations);
+	generateSubsets(v,k,start+1,currLen+1,used, combinations);
 
 	used[start] = false;
-	generateSubset(v,k,start+1,currLen,used, combinations);
+	generateSubsets(v,k,start+1,currLen,used, combinations);
 }
 //n choose k
-std::vector<std::vector<int> > MassConstraintFitter::generateIndicesCombinations(int vectorsize, int nparticles){
+void MassConstraintFitter::generateIndicesCombinations(int vectorsize, int nparticles, std::vector<std::vector<int> >& combinations){
 	int n = vectorsize;
 	int k = nparticles;
+//	std::cout<<"in gen combs"<<std::endl;
 		std::vector<int> master;
 		std::vector<bool> used(n);
-		std::vector<vector<int> > combinations;
+	//	std::vector<std::vector<int> > combinations;
 		for(int i=0; i<n; i++){
 			master.push_back(i);
 			used.at(i)=false;
 		}
+//	for(int i=0; i<master.size(); i++){
+//		std::cout<<"in gencombs master "<<master.at(i)<<" used "<<used.at(i)<<std::endl;
+//	}
+
 	generateSubsets(master,k,0,0,used,combinations);
-	return combinations;
+//	std::cout<<"in combin "<<combinations.size()<<std::endl;
+//	for(int i=0; i<combinations.size();i++){
+//		for(int j=0; j<combinations.at(i).size();j++){
+//		std::cout<<combinations.at(i).at(j)<<" ";
+//		}
+//		std::cout<<std::endl;
+//	}
+	
+//	generateSubsets(master,k,0,0,used,combinations);
+	
+//	return combinations;
 }
 //clone the old RP and update the momentum/Energy from the fit
 //these construction methods need the fit errrors too
 ReconstructedParticleImpl* MassConstraintFitter::constructFitParticle(TLorentzVector fitp, ReconstructedParticle* measrp){
-	ReconstructedParticleImpl* fitp = new ReconstructedParticleImpl();
+	ReconstructedParticleImpl* fitrp = new ReconstructedParticleImpl();
 	
-	fitrp = measrp->clone();
+	fitrp =(ReconstructedParticleImpl*) measrp->clone();
 	fitrp->setEnergy(fitp.E());
 	double* mom = new double[3];
 	mom[0]=fitp.Px();
@@ -866,9 +917,9 @@ ReconstructedParticleImpl* MassConstraintFitter::constructFitParticle(TLorentzVe
 	
 }
 //TODO ADD NEW FIT COV MATRIX
-Track* MassConstraintFitter::constructTrack(TLorentzVector fitp, Track* meast){
-	Track* fitt = new Track();
-	fitt = meast.clone();
+TrackImpl* MassConstraintFitter::constructTrack(TLorentzVector fitp, Track* meast){
+	TrackImpl* fitt = new TrackImpl();
+	fitt = (TrackImpl*)meast->clone();
 	const double c = 2.99792458e8; // m*s^-1
   	const double B = marlin::Global::GEAR->getBField().at(gear::Vector3D(0.,0.,0.)).z();;          
   	const double mm2m = 1e-3;
@@ -879,7 +930,7 @@ Track* MassConstraintFitter::constructTrack(TLorentzVector fitp, Track* meast){
 	double coslambda = fitp.Px()/(fitp.P()*cos(fitp.Phi()));
 	double tanlambda = sinlambda/coslambda;
 	double omega = eB/(fitp.P()*coslambda);
-	if(t->getOmega() < 0){
+	if(meast->getOmega() < 0){
 		omega = -omega;
 	}
 	fitt->setPhi(fitp.Phi());
@@ -899,6 +950,15 @@ std::vector<double> MassConstraintFitter::buildTrackVector(Track* t){
 	tvect.push_back(0.0);//sStart not measured
 	return tvect;
 }
+std::vector<double> MassConstraintFitter::build4vec(TLorentzVector v){
+	std::vector<double> v4;
+	v4.push_back(v.Px());
+	v4.push_back(v.Py());
+	v4.push_back(v.Pz());
+	v4.push_back(v.E());
+
+	return v4;
+}
 std::vector<double> MassConstraintFitter::buildFitTrackVector(TrackParticleFitObject* tfo){
 	std::vector<double> tvect;
 	// 6 parameters d0 phi omega z0 tanL sStart||sEnd
@@ -907,6 +967,16 @@ std::vector<double> MassConstraintFitter::buildFitTrackVector(TrackParticleFitOb
 		tvect.push_back(tfo->getParam(i));
 	}
 	return tvect;
+}
+void MassConstraintFitter::printCombinations(std::vector<std::vector<int> > combs){
+	std::cout<<"combinations "<< combs.size() <<std::endl;
+	for(int i=0; i<combs.size(); i++){
+		std::cout<<" [ ";
+		for(int j=0; j<combs.at(i).size(); j++){
+			std::cout<< combs.at(i).at(j) << " ";
+		}
+		std::cout<<" ] "<<std::endl;
+	}
 }
 //===================================================================================
 void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recparcol) {
@@ -930,7 +1000,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 
 	         TLorentzVector tempNeutral(_pfovec[i]->getMomentum()[0], _pfovec[i]->getMomentum()[1], _pfovec[i]->getMomentum()[2], _pfovec[i]->getEnergy() );
 		
-		if(_printing>1)std::cout << "Neutral candidate (px,py,pz,E) "<<tempNeutral.Px()<<" "<<tempNeutral.Py()<<" "<<tempNeutral.Pz()<<" "<<pGamma.E()<<std::endl;
+		if(_printing>1)std::cout << "Neutral candidate (px,py,pz,E) "<<tempNeutral.Px()<<" "<<tempNeutral.Py()<<" "<<tempNeutral.Pz()<<" "<<tempNeutral.E()<<std::endl;
 		if(_printing>1)std::cout << "Neutral candidate (E, theta, phi) "<< tempNeutral.E()<<" "<<tempNeutral.Theta()<<" "<<tempNeutral.Phi()<<std::endl;
 
 		/*if(_usePhotonCalibration){//check for ->getType()==22
@@ -954,7 +1024,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
   const double eB = B*c*mm2m*eV2GeV;
  //
  for(unsigned int i=0; i<_trackvec.size();i++){
-	for(unsigned int j=0; j<_daughterChargedMass.size(); j++{
+	for(unsigned int j=0; j<_daughterChargedMass.size(); j++){
 	
 		double cosLambda = 1 / std::sqrt(1 + _trackvec[i]->getTanLambda()*_trackvec[i]->getTanLambda() );
 		double P = (eB/fabs(_trackvec[i]->getOmega()))/cosLambda;
@@ -972,7 +1042,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 
 			TLorentzVector trk(px,py,pz,E);
 
-			if(_printing>1)std::cout << "-+ candidate "<< i <<" (px,py,pz,E,M)  "<< px << " " << py << " " << pz << " " << E << " " << M << std::endl;
+			if(_printing>1)std::cout << "-+ candidate "<< i <<" (px,py,pz,E,M)  "<< px << " " << py << " " << pz << " " << E << " " << trk.M() << std::endl;
 			if(_printing>1)std::cout << "-+ candidate "<< i << " (d0,phi,k,z0,tanLambda) " <<_trackvec[i]->getD0()<<" "<<_trackvec[i]->getPhi()<< " "<<_trackvec[i]->getOmega()<< " "<< _trackvec[i]->getZ0()<< " "<<_trackvec[i]->getTanLambda()<<std::endl;
 			
 			ptrack.push_back(trk);		
@@ -990,44 +1060,60 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
    //size check
     //if( pgamma.size() >= 1 && pplus.size() >= 1 && pminus.size() >= 1){
     if(pneutral.size() >= _nNeutral && _trackvec.size() >=  _nCharged){  //start back up here need to make ijk arrays with indices for both charged and neutral candidates
-    
+   std::cout<<"size of pneutral "<<pneutral.size()<<" "<<_nNeutral<<" size of ptrack "<<ptrack.size()<<" "<<_nCharged<<std::endl; 
 
 //store the best fit prob i,j,k then after iterating through all permutations recompute fit and compute analysis vars
 	double fitprobmax = -1;
 	//double candidate_ijk[3] = {-1,-1,-1};
-        vector<vector<int> > neutralCandidateIndices = generateIndicesCombinations(pneutral.size(), _nNeutral);
-	vector<vector<int> > chargedCandidateIndices = generateIndicesCombinations(ptrack.size(), _nCharged);
-	double fitprob = -1;
-
-	vector<int> bestCandidatesNeutral;
-	vector<int> bestCandidatesCharged;
+       std::vector<std::vector<int> > neutralCandidateIndices;
+	 generateIndicesCombinations(pneutral.size(), _nNeutral, neutralCandidateIndices);
+	std::vector<std::vector<int> > chargedCandidateIndices; 
+	 generateIndicesCombinations(ptrack.size(), _nCharged, chargedCandidateIndices);
+	double fitprob = -1 ;
+//test indices
 	
+	printCombinations(neutralCandidateIndices);
+	printCombinations(chargedCandidateIndices);
+
+
+
+	std::vector<int> bestCandidatesNeutral;
+	std::vector<int> bestCandidatesCharged;
+	
+
 	//iterate and fit all particle combinations, save the best one (highest fit probability)
 	double chargeSum= 0.0;
 	for(unsigned int i=0; i< neutralCandidateIndices.size(); i++){
-		for(unsigned int j=0; j< chargedCandidateIndices.size(); i++){
+		for(unsigned int j=0; j< chargedCandidateIndices.size(); j++){
 			//iterate over charged particles and find total charge
-			for( unsigned int k=0; k<chargeCandidateIndices.at(j).size(); k++){
-				 (pTrackVec[chargeCandidateIndices.at(j).at(k)].getOmega() < 0 ) ? chargeSum+=-1.0 : chargeSum+=1.0) ;
+			for( unsigned int k=0; k<chargedCandidateIndices.at(j).size(); k++){
+				 (pTrackVec[chargedCandidateIndices.at(j).at(k)]->getOmega() < 0 ) ? chargeSum+=-1.0 : chargeSum+=1.0 ;
 			}
+			std::cout<<"here"<<std::endl;
 			//if charge is consistent with parent, try fitting
 			//TODO check and see if neutral types are consistent?
 			if(chargeSum == _parentCharge){
-				OPALFitterGSL* fitter = setUpFit(neutralCandidateIndices.at(i), chargedCandidateIndices.at(j), pneutral, ptrack, pNeutralVec, pTrackVec);
+			//	OPALFitterGSL* 
+			NewtonFitterGSL* fitter = setUpFit(neutralCandidateIndices.at(i), chargedCandidateIndices.at(j), pneutral, ptrack, pNeutralVec, pTrackVec);
+				fitprob = fitter->getProbability();
 			}
-			if(fitprobmax == -1 && (fitprob > _fitPobabilityCut){
+			std::cout<<"probs (max,prob,cut) "<< fitprobmax<< " "<<fitprob<<" "<<_fitProbabilityCut<<std::endl;
+			if(fitprobmax == -1){// && (fitprob > _fitProbabilityCut)){
 				fitprobmax = fitprob;
 				bestCandidatesNeutral = neutralCandidateIndices.at(i);
 				bestCandidatesCharged = chargedCandidateIndices.at(j);
 			}
-			if( (fitprob > fitprobmax ) && (fitprob > _fitProbabilityCut)){
+			if( (fitprob > fitprobmax )){//{ && (fitprob > _fitProbabilityCut)){
 				fitprobmax = fitprob;
 				bestCandidatesNeutral = neutralCandidateIndices.at(i);
 				bestCandidatesCharged = chargedCandidateIndices.at(j);
 			}
 			neutralJets.clear();
-			chargedFO.clear();
+			TrackFO.clear();
+			std::cout<<"about to del "<<std::endl;
 			delete fitter;
+			std::cout<<"after del "<<std::endl;
+			chargeSum=0.0;
 		}
 	}
      
@@ -1035,22 +1121,26 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	//recompute params for best fit probability
 //if nothing makes it for this event just return
 	if(bestCandidatesNeutral.size()==0 && bestCandidatesCharged.size()==0){
-		evtNo++; 
+		evtNo++;
+		std::cout<<"no particles"<<std::endl; 
 		return;
 	}  
 
 	//now refit with best candidates
-	OPALFitterGSL* fitter = setUpFit(neutralIndices, chargedIndices, pneutral, ptrack, pNeutralVec, pTrackVec);
-	
+//	OPALFitterGSL*
+ NewtonFitterGSL* fitter = setUpFit(bestCandidatesNeutral, bestCandidatesCharged, pneutral, ptrack, pNeutralVec, pTrackVec);
+		
 					
-	int cov_dim;
+	int cov_dim=(3*_nNeutral + 5*_nCharged);
 	double * cov = fitter->getGlobalCovarianceMatrix(cov_dim);  //3*(r+k) === 3*(_nNeutral + _nCharged)
 	//construct measured cov matrix
+
 //	double * mcov = ConstructParentMeasCovMatrix();
 	//if cov matrix dimension is not correct return, fit did not converge
 	if(cov_dim == 0){
 		evtNo++;
-		return;
+		std::cout<<"no cov"<<std::endl;
+	//	return;
 	}
 	
 	//build up fit data structures TLVs first
@@ -1059,66 +1149,93 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	TLorentzVector temp;
 	for(int i=0; i<neutralJets.size() ; i++){
 		temp.SetPxPyPzE(neutralJets.at(i)->getPx(),neutralJets.at(i)->getPy(), neutralJets.at(i)->getPz(), neutralJets.at(i)->getE());
-		fitNeutral.push_back(temp);
+		std::cout<<"fit jet "<<i<<" "<<neutralJets.at(i)->getParam(0)<<" "<<neutralJets.at(i)->getParam(1)<<" "<< neutralJets.at(i)->getParam(2)<<std::endl;
+		std::cout<<"fit jet err "<<i<<" "<<neutralJets.at(i)->getError(0)<<" "<<neutralJets.at(i)->getError(1)<<" "<<neutralJets.at(i)->getError(2)<<std::endl;	
+	fitNeutral.push_back(temp);
+		fitNeutralVec.push_back(build4vec(temp));
 	}
-	for(int i=0; i<chargedFO.size() ; i++){
-		temp.SetPxPyPzE(trackFO.at(i)->getPx(), TrackFO.at(i)->getPy(), TrackFO.at(i)->getPz(), TrackFO.at(i)->getE());
-		
+	for(int i=0; i<TrackFO.size() ; i++){
+		temp.SetPxPyPzE(TrackFO.at(i)->getPx(), TrackFO.at(i)->getPy(), TrackFO.at(i)->getPz(), TrackFO.at(i)->getE());
+	std::cout<<"fit trk "<<i<<" "<<TrackFO.at(i)->getParam(0)<<" "<<TrackFO.at(i)->getParam(1)<<" "<<TrackFO.at(i)->getParam(2)<<" "<<TrackFO.at(i)->getParam(3)<<" "<<TrackFO.at(i)->getParam(4)<<" "<<TrackFO.at(i)->getParam(5)<<std::endl;
+	std::cout<<"fit trk err ";
+	for(int j=0 ;j<6; j++){
+		std::cout<<TrackFO.at(i)->getError(j)<<" ";
+	}
+	std::cout<<std::endl;
+	std::cout<<"fit trk tlv "<<i<<" "<<TrackFO.at(i)->getPx()<<" "<< TrackFO.at(i)->getPy()<<" "<< TrackFO.at(i)->getPz()<< " " << TrackFO.at(i)->getE()<<std::endl;
 		fitCharged.push_back(temp);
-		fitTrack.push_back(buildFitTrackVector(TrackFO.at(i));
+		fitChargedVec.push_back(build4vec(temp));
+		fitTrackVec.push_back(buildFitTrackVector(TrackFO.at(i)));
 		
 	}
+	fitParent.SetPxPyPzE(0,0,0,0);
 	for(int i=0; i<fitNeutral.size(); i++){
-		fitParent += fitNeutral.at(i);	
+		fitParent += fitNeutral.at(i);
+		std::cout<<"parent e m "<<fitParent.E()<<" "<<fitParent.M()<<std::endl;	
 	}
 	for(int i=0; i<fitCharged.size(); i++){
 		fitParent += fitCharged.at(i);
+		std::cout<<"parent e m "<<fitParent.E()<<" "<<fitParent.M()<<std::endl;
 	}
 
-
+std::cout<<"set fit vals "<<std::endl;
 
 	
 	//sets an array of charged and neutral errors arrays from cov
-	setFitErrors(cov, cov_dim);
+//
+//setFitErrors(cov, cov_dim);
 	std::vector<ReconstructedParticle*> recoNeutraltemp; // be safe and clear these at the end
 	//std::vector<Track*> recoTracktemp;
 	//put candidates into local LorentzVector for ease of coding and readability
 	//do TLVs first then make new RecoParts to get generate errors
 	for(int i=0; i<bestCandidatesCharged.size(); i++){
 		measCharged.push_back( ptrack.at(bestCandidatesCharged[i]));
+		measChargedVec.push_back(build4vec(ptrack.at(bestCandidatesCharged[i])));
 		measTrack.push_back( pTrackVec.at(bestCandidatesCharged[i]));
 		//recoTracktemp.push_back(pTrackVec.at(bestCandidatesCharged[i]));
+		measTrackVec.push_back(buildTrackVector( pTrackVec.at(bestCandidatesCharged[i])));
 	}
 	for(int i=0; i<bestCandidatesNeutral.size(); i++){
 		measNeutral.push_back( pneutral.at(bestCandidatesNeutral[i]));
+		measNeutralVec.push_back(build4vec(ptrack.at(bestCandidatesCharged[i])));
 		recoNeutraltemp.push_back( pNeutralVec.at(bestCandidatesNeutral[i]));
 	}
 	//make reco particles
+	measParent.SetPxPyPzE(0,0,0,0);
+	for(int i=0; i<measNeutral.size(); i++){
+		measParent+= measNeutral.at(i);
+		std::cout<<"parent meas e m "<<measParent.E()<<" "<<measParent.M()<<std::endl;	
+	}
+	for(int i=0; i<measCharged.size(); i++){
+		measParent+= measCharged.at(i);
+		std::cout<<"parent meas  e m "<<measParent.E()<<" "<<measParent.M()<<std::endl;	
+	}
 
-
+	std::cout<<"set meas vals"<<std::endl;
 	//also have error arrays ready locally for readability
 	//Photon Errors go {dE,dTheta,dPhi}
 	//ChargedParticle errors go {dk, dTheta, dPhi}
 	for(int i=0; i<measCharged.size(); i++){
-		measCharged_err.push_back( getChargedParticleErrors(measCharged.at(i), recoTracktemp.at(i)) );
+		measCharged_err.push_back( getChargedParticleErrors(measCharged.at(i), measTrack.at(i)) );
 	}
 	for(int i=0; i<measNeutral.size(); i++){
 		measNeutral_err.push_back( getNeutralErrors( measNeutral.at(i), recoNeutraltemp.at(i)) );
 	}
-	
+	std::cout<<"set meas err "<<std::endl;
 	//construct measured cov matrix must be called after measured global vectors are populated
 	double * mcov = ConstructParentMeasCovMatrix();
 
+	std::cout<<"set p mes err matrix "<<std::endl;
 	//populate measured  parent errors from covariance matrix
-	FloatVec fitParentCov =  ConstructCovMatrix(fitTrack,fitNeutral,cov);  
-	FloatVec measParentCov = ConstructCovMatrix(measCharged,measNeutral,mcov);
-	setParentErrors(measParentCov, fitParentCov);
+	FloatVec fitParentCov;// =  ConstructCovMatrix(fitTrackVec,fitCharged,fitNeutral,cov);  
+	FloatVec measParentCov;// = ConstructCovMatrix(measTrackVec,measCharged,measNeutral,mcov);
+//	setParentErrors(measParentCov, fitParentCov);
 	
 	
 
-
+ std::cout<<"HERE"<< _printing <<std::endl;
 ///im to this point
-	if(_printing>3){
+	if(_printing>1){
 		std::cout <<"Optimal Candidate Fit Quantities-------------"<<std::endl;
 		std::cout << "Constrained fit results  RC: " << fitter->getError() << std::endl;
 		std::cout << "Measured mass = " << measParent.M() << std::endl;
@@ -1130,14 +1247,17 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 		for(int i=0; i< fitCharged.size(); i++){
 			std::cout << "Track "<< i <<" (d0,phi,omega,z0,tanL,M): "<<std::endl;
 			std::cout << " Measured: ";//<< 1/measCharged.at(i).Perp() <<" "<< measCharged.at(i).Theta() <<" "<<measCharged.at(i).Phi()<<" "<<measCharged.at(i).M()<<" ";
-			for(int j=0; j<measTrack.size(); j++){
-				std::cout<< measTrack.at(i) << " ";
+//
+//std::cout<< measTrackVec.at(i).size() <<" meastvec size "<<std::endl;
+			for(int j=0; j<measTrackVec.at(i).size(); j++){
+				std::cout<< measTrackVec.at(i).at(j) << " ";
 			}
 			std::cout << measCharged.at(i).M() <<std::endl;
 
 			std::cout << " Fit: ";// << 1/fitCharged.at(i).Perp() <<" "<<fitCharged.at(i).Theta() <<" "<<fitCharged.at(i).Phi()<<" "<<fitChaged.at(i).M()<<std::endl;
-			for(int j=0; j<fitTrack.size(); j++){
-				std::cout<< fitTrack.at(i) << " ";
+			for(int j=0; j<fitTrackVec.at(i).size(); j++){
+				std::cout<< fitTrackVec.at(i).at(j) << " ";
+
 			}
 			std::cout << fitCharged.at(i).M() <<std::endl;
 
@@ -1147,26 +1267,26 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 				std::cout<< measCharged_err.at(i).at(j);
 			}
 			std::cout <<" Fit: ";
-			for(int j=0; j<fitCharged_err.at(i).size(); j++){
-				std::cout<< fitCharged_err.at(i).at(j);
-			}
+	//		for(int j=0; j<fitCharged_err.at(i).size(); j++){
+	//			std::cout<< fitCharged_err.at(i).at(j);
+	//		}
 			std::cout<<std::endl;
 
 		}
 
 		for(int i=0; i< fitNeutral.size(); i++){
 			std::cout << "Neutral "<< i <<" (E,theta,phi,M): "<<std::endl;
-			std::cout << " Measured: "<< measNeutral.at(i).E() <<" "<< measNeutral.at(i).Theta() <<" "<<measNeutral.at(i).Phi()<<" "<<measNeural.at(i).M()<<" ";
-			std::cout << " Fit: " << fitNeutral.at(i).E() <<" "<<fitNeutral.at(i).Theta() <<" "<<fitNeutral.at(i).Phi()<<" "<<fitNeural.at(i).M()<<std::endl;
+			std::cout << " Measured: "<< measNeutral.at(i).E() <<" "<< measNeutral.at(i).Theta() <<" "<<measNeutral.at(i).Phi()<<" "<<measNeutral.at(i).M()<<" ";
+			std::cout << " Fit: " << fitNeutral.at(i).E() <<" "<<fitNeutral.at(i).Theta() <<" "<<fitNeutral.at(i).Phi()<<" "<<fitNeutral.at(i).M()<<std::endl;
 			std::cout << "Neutral "<< i <<" Errors (dE, dtheta, dphi): "<<std::endl;
 			std::cout << "Measured: ";
 			for(int j=0; j<measNeutral_err.at(i).size(); j++){
 				std::cout<< measNeutral_err.at(i).at(j);
 			}
 			std::cout <<" Fit: ";
-			for(int j=0; j<fitNeutral_err.at(i).size(); j++){
-				std::cout<< fitNeutral_err.at(i).at(j);
-			}
+	//		for(int j=0; j<fitNeutral_err.at(i).size(); j++){
+	//			std::cout<< fitNeutral_err.at(i).at(j);
+	//		}
 			std::cout<<std::endl;
 
 		}
@@ -1176,9 +1296,9 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 		std::cout <<"----------------------"<<std::endl;
 
 		std::cout<<"Measured Covariance Matrix: "<<std::endl;
-		PrintCov(mcov,(6*_nCharged+3*_nNeutral));
+		PrintCov(mcov,6*_nCharged+3*_nNeutral);
 		std::cout<<"Fit Covariance Matrix: "<<std::endl;
-		PrintCov(cov,6*_nCharged+3*_nNeutral));
+		PrintCov(cov,6*_nCharged+3*_nNeutral);
 		std::cout<<"Measured Parent 4vector 4x4 Covariance Matrix: "<<std::endl;
 		PrintCov(measParentCov,4);
 		std::cout<<"Fit Parent 4vector 4x4 Covariance Matrix: "<<std::endl;
@@ -1193,15 +1313,15 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 
 			if(_parentCharge == 0){
 				//parent is neutral store as a reco
-				ReconstrucedParticleImpl * recoPart = new ReconstructedParticleImpl();
+				ReconstructedParticleImpl * recoPart = new ReconstructedParticleImpl();
 				//adding old particles to fit particle because lazy and dont want to make new RecoParts*
 				for(int i=0; i<fitNeutral.size(); i++){
 					//NOTE: these constiuent particles dont have updated covariance matrices only P,E
 					recoPart->addParticle(constructFitParticle( fitNeutral.at(i),recoNeutraltemp.at(i)));
 				}
-				for(int i=0; i<recoTracktemp.size(); i++){
-					recoPart->addTrack(constructFitTrack( fitCharged.at(i),rectoTracktemp.at(i)));
-				}
+			//	for(int i=0; i<recoTracktemp.size(); i++){
+			//		recoPart->addTrack(constructFitTrack( fitCharged.at(i),rectoTracktemp.at(i)));
+			//	}
 				recoPart->setEnergy(fitParent.E());
 				double mom[3] = {fitParent.Px(), fitParent.Py(), fitParent.Pz() };
 				recoPart->setMomentum(mom);
@@ -1217,7 +1337,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 			//if the parent is charged store a track, jacobians have not been derived for this yet
 			if(_parentCharge != 0){
 				//parent is charged store as a track
-				TrackImpl* recoTrack = TrackImpl();
+			//	TrackImpl* recoTrack = TrackImpl();
 				//recoTrack = constructFitTrack( fitCharged
 				
 			}
@@ -1225,9 +1345,9 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 			//add stuff to regular ttree
 			if(_fitAnalysis){
 
- 				RecoEnergy=parentmeas.E();
-				FitEnergy=parentFit.E();
-				RecoMass=parentmeas.M();
+ 				RecoEnergy=measParent.E();
+				FitEnergy=fitParent.E();
+				RecoMass=measParent.M();
 				FitProbability=fitprob; 
 				/*P1_k_FitMeas_pull= (1/p1Fit.Perp() -1/p1meas.Perp())/ std::sqrt( p1meas_err[0]*p1meas_err[0] - cov[0] )  ;
 				P1_Theta_FitMeas_pull= (p1Fit.Theta() - p1meas.Theta())/ std::sqrt(p1meas_err[1]*p1meas_err[1] - cov[10]) ;	
@@ -1243,27 +1363,30 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 				Gamma_Phi_FitMeas_pull=getPhiResidual(gammaFit.Phi(), gammameas.Phi())/std::sqrt( gammameas_err[2]*gammameas_err[2] - cov[80]) ;*/
 			
 				//charged pulls fit and measured
-				for(int i=0; i<measTrack.size(); i++){
-					for(int j=0; j<measTrack.at(i).size(); j++){
-						fitmeas_ChargedPulls.push_back( measTrack.at(j)-fitTrack.at(j)/ ( std::sqrt( measCharged_err.at(j)*measCharged_err.at(j) - fitCharged_err.at(j)*fitCharged_err.at(j)) ) );
+		/*		for(int i=0; i<measTrack.size(); i++){
+					for(int j=0; j<measTrackVec.at(i).size(); j++){
+						fitmeas_ChargedPulls.push_back( (measTrackVec.at(i).at(j)-fitTrackVec.at(i).at(j))/ ( std::sqrt( measCharged_err.at(i).at(j)*measCharged_err.at(i).at(j) - fitCharged_err.at(i).at(j)*fitCharged_err.at(i).at(j)) ) );
 					}
 				}
 				//neutral pulls fit andmeasured
 				for(int i=0; measNeutral.size(); i++){
-					for(int j=0; j<measNeutral.at(i).size();j++){
-						fitmeas_NeutralPulls.push_Back( measNeutral.at(j)-fitNeutral.at(j)/ ( std::sqrt( measNeutral_err.at(j)*measNeutral_err.at(j) - fitNeutral_err.at(j)*fitNeutral_err.at(j)) ) );
-					}
+				//	for(int j=0; j<measNeutral.at(i).size();j++){
+				//		fitmeas_NeutralPulls.push_back( (measNeutral.at(i).at(j)-fitNeutral.at(i).at(j))/ ( std::sqrt( measNeutral_err.at(i).at(j)*measNeutral_err.at(i).at(j) - fitNeutral_err.at(i).at(j)*fitNeutral_err.at(i).at(j)) ) );
+				//	}
+				 	fitmeas_NeutralPulls.push_back( (measNeutral.at(i).E()-fitNeutral.at(i).E())/ (std::sqrt(measNeutral_err.at(i).at(0)*measNeutral_err.at(i).at(0) - fitNeutral_err.at(i).at(0)*fitNeutral_err.at(i).at(0)) ) );
+					fitmeas_NeutralPulls.push_back( (measNeutral.at(i).Theta()-fitNeutral.at(i).Theta())/ (std::sqrt(measNeutral_err.at(i).at(1)*measNeutral_err.at(i).at(1) -fitNeutral_err.at(i).at(1)*fitNeutral_err.at(i).at(1)) ) );
+					fitmeas_NeutralPulls.push_back( (measNeutral.at(i).Phi()-fitNeutral.at(i).Phi())/ (std::sqrt(measNeutral_err.at(i).at(2)*measNeutral_err.at(i).at(2)- fitNeutral_err.at(i).at(2)*fitNeutral_err.at(i).at(1)) ) );
 				}
 				
 		//		if(Gamma_Phi_FitMeas_pull > 100){
 		//			 std::cout<<"crazy!!"<<std::endl;
 		//			std::cout<<gammaFit.Phi()<<" "<<gammameas.Phi()<<" "<<getPhiResidual(gammaFit.Phi(), gammameas.Phi()) <<" "<<gammameas_err[2]<<" "<<cov[20]<<std::endl;
 		//		}
-
-				fitmeas_ParentPulls.push_back(( fitparent.Px() - measparent.Px())/ std::sqrt(measparent_err[0]*measparent_err[0]-fitparent_err[0]*fitparent_err[0])) ;
-				fitmeas_ParentPulls.push_back(( fitparent.Py() - measparent.Py())/ std::sqrt(measparent_err[1]*measparent_err[1]-fitparent_err[1]*fitparent_err[1])) ;
-				fitmeas_ParentPulls.push_back(( fitparent.Pz() - measparent.Pz())/ std::sqrt(measparent_err[2]*measparent_err[2]-fitparent_err[2]*fitparent_err[2])) ;
-				fitmeas_ParentPulls.push_back(( fitparent.E() - measparent.E())/ std::sqrt(measparent_err[3]*measparent_err[3]-fitparent_err[3]*fitparent_err[3])) ;
+*///commenting out pulls for now
+				fitmeas_ParentPulls.push_back(( fitParent.Px() - measParent.Px())/ std::sqrt(measParent_err[0]*measParent_err[0]-fitParent_err[0]*fitParent_err[0])) ;
+				fitmeas_ParentPulls.push_back(( fitParent.Py() - measParent.Py())/ std::sqrt(measParent_err[1]*measParent_err[1]-fitParent_err[1]*fitParent_err[1])) ;
+				fitmeas_ParentPulls.push_back(( fitParent.Pz() - measParent.Pz())/ std::sqrt(measParent_err[2]*measParent_err[2]-fitParent_err[2]*fitParent_err[2])) ;
+				fitmeas_ParentPulls.push_back(( fitParent.E() - measParent.E())/ std::sqrt(measParent_err[3]*measParent_err[3]-fitParent_err[3]*fitParent_err[3])) ;
 
 				Chisq = fitter->getChi2();
 				//tree->Fill();
@@ -1312,8 +1435,9 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 						_mcpartvec[mcpgindex]->getEnergy());
 				*/
 			//build up mcp 4vetors
+				TLorentzVector mcp;
 				for(int i=0; i< chargedMCPIndices.size(); i++){
-					TLorentzvector mcp;
+					//TLorentzvector mcp;
 					if( chargedMCPIndices.at(i) != -1){
 						
 						mcp.SetPxPyPzE(_mcpartvec[chargedMCPIndices.at(i)]->getMomentum()[0],
@@ -1328,7 +1452,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 
 				}
 				for(int i=0; i< neutralMCPIndices.size(); i++){
-					TLorentzVector mcp;
+				//	TLorentzVector mcp;
 					if( neutralMCPIndices.at(i) != -1){
 						mcp.SetPxPyPzE(_mcpartvec[neutralMCPIndices.at(i)]->getMomentum()[0],
 						_mcpartvec[neutralMCPIndices.at(i)]->getMomentum()[1],
@@ -1393,10 +1517,10 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 						std::cout<<"crazzy!! phi from meas gen"<<std::endl;
 					}*/
 					//genTree->Fill();	
-                        	}
- 				else{
-					std::cout<<"Could not locate all corresponding MC particles"<<std::endl;
-				}
+                        //	}
+ 			//	else{
+			//		std::cout<<"Could not locate all corresponding MC particles"<<std::endl;
+			//	}
 			}//end genfit analysis option
                 }//end prob cut
 	}// end cov dim check
@@ -1410,21 +1534,24 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 
 	measNeutral.clear();
 	measCharged.clear();
-	mesaTrack.clear();
+	measTrack.clear();
 	fitNeutral.clear();
 	fitCharged.clear();
 	fitTrack.clear();
+	measNeutralVec.clear();
+	measChargedVec.clear();
 	
 	measCharged_err.clear();
 	measNeutral_err.clear();
-	parentmeas_err.clear();
+	measParent_err.clear();
 
 	fitCharged_err.clear();
 	fitNeutral_err.clear();
 	
 	measParent_err.clear();
 	fitParent_err.clear();
-
+//	neutralCandidateIndices.clear();
+//	chargedCandidateIndices.clear();
 	//gammagen_err.clear();
 		neutralJets.clear();
 		TrackFO.clear();
