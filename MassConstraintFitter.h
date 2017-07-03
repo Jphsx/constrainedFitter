@@ -1,5 +1,6 @@
 #include "marlin/Processor.h"
 #include "EVENT/ReconstructedParticle.h"
+#include "IMPL/TrackImpl.h"
 #include "EVENT/Track.h"
 #include "EVENT/MCParticle.h"
 #include "lcio.h"
@@ -10,16 +11,19 @@
 #include "CLHEP/Vector/LorentzVector.h"
 #include "TLorentzVector.h"
 typedef CLHEP::HepLorentzVector LorentzVector ;
-
 //#include "LeptonFitObject.h"
 #include "TrackParticleFitObject.h"
 #include "JetFitObject.h"
+#include "VertexFitObject.h"
 #include "OPALFitterGSL.h"
-#include "NewFitterGSL.h"
+//#include "NewFitterGSL.h"
 #include "NewtonFitterGSL.h"
 #include "MassConstraint.h"
-
-
+//#pragma link C++ class std::vector<std::vector<double> >+;
+//#pragma link C++ class vector<vector<double> >+;
+//#pragma link C++ class vector<TLorentzVector>+;
+//#pragma link C++ class std::vector<TLorentzVector>+;
+//#pragma link C++ class std::vector<Track*>+;
 using namespace lcio ;
 
 
@@ -31,13 +35,13 @@ using namespace lcio ;
  * Code follows convention X -> p1+ p2- gamma
  */
 
-class DiTrackGammaCandidateFinder : public marlin::Processor {
+class MassConstraintFitter : public marlin::Processor {
   
  public:
   
- virtual marlin::Processor*  newProcessor() { return new DiTrackGammaCandidateFinder ; }
+ virtual marlin::Processor*  newProcessor() { return new MassConstraintFitter ; }
   
-  DiTrackGammaCandidateFinder() ;
+  MassConstraintFitter() ;
 
   /** Called at the beginning of the job before anything is read.
    *  Use to initialize the proscessor, e.g. book histograms.
@@ -55,39 +59,43 @@ class DiTrackGammaCandidateFinder : public marlin::Processor {
   /** Called after data processing for clean up.
    */
   virtual void end() ;
-
+private:
   bool FindPFOs( LCEvent* evt );
   bool FindTracks( LCEvent* evt );
   bool FindMCParticles( LCEvent* evt);
   
 
   int getCorrespondingMCParticleIndex(TLorentzVector rec);
-  void FindDiTrackGammaCandidates( LCCollectionVec* recparcol);
+  void FindMassConstraintCandidates( LCCollectionVec* recparcol);
 
-   OPALFitterGSL* setUPFit(vector<int> neutralIndices, vector<int> chargedIndices, vector<TLorentzVector> pneutral, vector<TLorentzVector> ptrack, vector<ReconstructedParticle*> pNeutralVec, vector<Track*> pTrackVec);
+//   OPALFitterGSL* 
+NewtonFitterGSL* setUpFit(std::vector<int> neutralIndices, std::vector<int> chargedIndices, std::vector<TLorentzVector> pneutral, std::vector<TLorentzVector> ptrack, std::vector<ReconstructedParticle*> pNeutralVec, std::vector<Track*> pTrackVec);
   std::vector<double> getChargedParticleErrors(TLorentzVector pcharged, Track* ptrk);
   std::vector<double> getNeutralErrors(TLorentzVector pneutral, ReconstructedParticle* pNeutral);
 
   void PrintCov(FloatVec cov, int dim);
   void PrintCov(double* cov, int dim);
-  void setFitErrors(double* cov);
+  void setFitErrors(double* cov, int dim);
   double* ConstructParentMeasCovMatrix();
-  std::vector<double> ConstructChargedSubMatrix(std::vector<double> p, TLorentzVector ptlv);
-  std::vector<double> ConstructNeutralSubMatrix(TLorenztVector p);
+  std::vector<double> ConstructChargedSubMatrix(std::vector<double> trackparams, TLorentzVector ptlv);
+  std::vector<double> ConstructNeutralSubMatrix(TLorentzVector p);
   double* ConcatSubMatrices(std::vector<std::vector<double> > matrices);
   void setParentErrors(FloatVec meascov, FloatVec fitcov);
-  void generateSubsets(std::vector<int> v, int k, int start, int currLen, std::vector<bool> used, std::vector<vector<int> >& combinations);
+  void generateSubsets(std::vector<int> v, int k, int start, int currLen, std::vector<bool> used, std::vector<std::vector<int> >& combinations);
+  FloatVec ConstructCovMatrix(std::vector<std::vector<double> > trackparams, std::vector<TLorentzVector> charged, std::vector<TLorentzVector> neutral, double* cov);
   
-	std::vector<std::vector<int> > generateIndicesCombinations(int vectorsize, int nparticles);
+	void generateIndicesCombinations(int vectorsize, int nparticles,std::vector<std::vector<int> >& combinations);
 
 	ReconstructedParticleImpl* constructFitParticle(TLorentzVector fitp, ReconstructedParticle* measrp);
 
-  Track* constructTrack(TLorentzVector fitp, Track* meast);
+  TrackImpl* constructTrack(TLorentzVector fitp, Track* meast);
   std::vector<double> buildTrackVector(Track* t);
+  std::vector<double> build4vec(TLorentzVector v);
   std::vector<double> buildFitTrackVector(TrackParticleFitObject* tfo);
 
-  FloatVec ConstructCovMatrix(std::vector<TLorentzVector> charged, std::vector<TLorentzVector> neutral, double* cov);
-
+  void printCombinations(std::vector<std::vector<int> > combs);
+ // FloatVec ConstructCovMatrix(std::vector<std::vector<double> > trackparams, std::vector<TLorentzVector> charged, std::vector<TLorentzVector> neutral, double* cov);
+ protected:
 //TTree stuff for fit analysis
   TFile *rootFile;
   //normal analysis tree for comparing fits to measured
@@ -109,57 +117,61 @@ class DiTrackGammaCandidateFinder : public marlin::Processor {
   int evtNo;
 
 //add variables
-  vector<TLorentzVector> measNeutral;
-  vector<TLorentzVector> measCharged;
-  vector<vector<double> > measTrack;
-  vector<TLorentzVector> fitNeutral;
-  vector<TLorentzVector> fitCharged;
-  vector<vector<double> > fitTrack;
+ std::vector<TLorentzVector> measNeutral;
+  std::vector<TLorentzVector> measCharged;
+  std::vector<std::vector<double> > measNeutralVec;
+  std::vector<std::vector<double> > measChargedVec;
+  std::vector<Track*> measTrack;
+  std::vector<std::vector<double> > measTrackVec;
+  std::vector<TLorentzVector> fitNeutral;
+  std::vector<TLorentzVector> fitCharged;
+  std::vector<std::vector<double> > fitNeutralVec;
+  std::vector<std::vector<double> > fitChargedVec;
+  std::vector<Track*> fitTrack;
+  std::vector<std::vector<double> > fitTrackVec;
 
-  vector<vector<double> > measNeutral_err;
-  vector<vector<double> > measCharged_err;
-  vector<vector<double> > fitNeutral_err;
-  vector<vector<double> > fitCharged_err;
+  std::vector<std::vector<double> > measNeutral_err;
+  std::vector<std::vector<double> > measCharged_err;
+  std::vector<std::vector<double> > measTrack_err;
+  std::vector<std::vector<double> > fitTrack_err;
+  std::vector<std::vector<double> > fitNeutral_err;
+  std::vector<std::vector<double> > fitCharged_err;
 
-  vector<double> measNeutralPdg;
-  vector<double> measChargedPdg;
+  std::vector<double> measNeutralPdg;
+  std::vector<double> measChargedPdg;
 
 	//vector<double>: (E || k, Theta, Phi); pull order
-  vector<vector<double> > fitmeas_NeutralPulls;
-  vector<vector<double> > fitmeas_ChargedPulls;
+  std::vector<std::vector<double> > fitmeas_NeutralPulls;
+  std::vector<std::vector<double> > fitmeas_ChargedPulls;
 
   TLorentzVector measParent;
   TLorentzVector fitParent;
 
-  vector<double> measParent_err;
-  vector<double> fitParent_err;
+  std::vector<double> measParent_err;
+  std::vector<double> fitParent_err;
 
 		//(Px, Py, Pz, E) pull order
-  vector<double> fitmeas_ParentPulls;
+  std::vector<double> fitmeas_ParentPulls;
 
   //monte carlo variables
 
-  vector<TLorentzVector> genNeutral;
-  vector<TLorentzVector> genCharged;
+  std::vector<TLorentzVector> genNeutral;
+  std::vector<TLorentzVector> genCharged;
 
 	//vector<double>? (E , Theta, Phi); pull order even for charged particles
-  vector<vector<double> > measgen_NeutralPulls;  
-  vector<vector<double> > measgen_ChargedPulls;
-  vector<vector<double> > fitgen_NeutralPulls;
-  vector<vector<double> > fitgen_ChargedPulls;
+  std::vector<std::vector<double> > measgen_NeutralPulls;  
+  std::vector<std::vector<double> > measgen_ChargedPulls;
+  std::vector<std::vector<double> > fitgen_NeutralPulls;
+  std::vector<std::vector<double> > fitgen_ChargedPulls;
 
   TLorentzVector genParent;
 
-  vector<double> genNeutralPdg;
-  vector<double> genChargedPdg;
+  std::vector<double> genNeutralPdg;
+  std::vector<double> genChargedPdg;
 
-  vector<vector<double> > mcTrack;//not implemented yet
-  vector<TLorentzVector> mcCharged;
-  vector<TLorentzVector> mcNeutral;
-
-
-  
-private:
+  std::vector<std::vector<double> > mcTrack;//not implemented yet
+  std::vector<TLorentzVector> mcCharged;
+  std::vector<TLorentzVector> mcNeutral;
 
 
 
@@ -170,15 +182,16 @@ private:
 	int _nDaughters;
 	int _nCharged;
 	int _nNeutral;
-	vector<double> _daughterChargedPdgs;
-	vector<double> _daughterNeutralPdgs;
-	vector<double> _daugherChargedMass;
-	vector<double> _daughterNeutralMass;
+	std::vector<int> _daughterChargedPdgs;
+	std::vector<int> _daughterNeutralPdgs;
+	std::vector<float> _daughterChargedMass;
+	std::vector<float> _daughterNeutralMass;
 
 
   //global fitobject pointers
   //return Fit objects in the fitter is not retaining the derived class and chopping to base class
- 
+// std::vector<std::vector<int> > neutralCandidateIndices;
+// std::vector<std::vector<int> > chargedCandidateIndices;
 // JetFitObject* gammaJet;
   std::vector<JetFitObject*> neutralJets;
 
@@ -186,8 +199,9 @@ private:
  // LeptonFitObject* part2;
 //  std::vector<LeptonFitObject*> chargedFO; 
     std::vector<TrackParticleFitObject*> TrackFO;
-//  OPALFitterGSL* fitter;
-    BaseFitter* ftest;
+// OPALFitterGSL*
+NewtonFitterGSL* fitter;
+//    BaseFitter* ftest;
 
   std::vector<ReconstructedParticle*>_pfovec;
   std::vector<Track*> _trackvec;
@@ -206,6 +220,5 @@ private:
  
   std::string m_rootFile;
 
-protected:
 
 } ;
