@@ -11,7 +11,7 @@
 #include "CLHEP/Vector/LorentzVector.h"
 #include "TLorentzVector.h"
 typedef CLHEP::HepLorentzVector LorentzVector ;
-//#include "LeptonFitObject.h"
+#include "LeptonFitObject.h"
 #include "TrackParticleFitObject.h"
 #include "JetFitObject.h"
 #include "VertexFitObject.h"
@@ -68,11 +68,10 @@ private:
   int getCorrespondingMCParticleIndex(TLorentzVector rec);
   void FindMassConstraintCandidates( LCCollectionVec* recparcol);
 
-//   OPALFitterGSL* 
-NewtonFitterGSL* setUpFit(std::vector<int> neutralIndices, std::vector<int> chargedIndices, std::vector<TLorentzVector> pneutral, std::vector<TLorentzVector> ptrack, std::vector<ReconstructedParticle*> pNeutralVec, std::vector<Track*> pTrackVec);
+   OPALFitterGSL*  setUpFit(std::vector<int> neutralIndices, std::vector<int> chargedIndices, std::vector<TLorentzVector> pneutral, std::vector<TLorentzVector> ptrack, std::vector<ReconstructedParticle*> pNeutralVec, std::vector<Track*> pTrackVec);
   std::vector<double> getChargedParticleErrors(TLorentzVector pcharged, Track* ptrk);
   std::vector<double> getNeutralErrors(TLorentzVector pneutral, ReconstructedParticle* pNeutral);
-
+  std::vector<double> getTrackErrors(Track* ptrk);
   void PrintCov(FloatVec cov, int dim);
   void PrintCov(double* cov, int dim);
   void setFitErrors(double* cov, int dim);
@@ -83,7 +82,7 @@ NewtonFitterGSL* setUpFit(std::vector<int> neutralIndices, std::vector<int> char
   void setParentErrors(FloatVec meascov, FloatVec fitcov);
   void generateSubsets(std::vector<int> v, int k, int start, int currLen, std::vector<bool> used, std::vector<std::vector<int> >& combinations);
   FloatVec ConstructCovMatrix(std::vector<std::vector<double> > trackparams, std::vector<TLorentzVector> charged, std::vector<TLorentzVector> neutral, double* cov);
-  
+ void clear(); 
 	void generateIndicesCombinations(int vectorsize, int nparticles,std::vector<std::vector<int> >& combinations);
 
 	ReconstructedParticleImpl* constructFitParticle(TLorentzVector fitp, ReconstructedParticle* measrp);
@@ -92,8 +91,10 @@ NewtonFitterGSL* setUpFit(std::vector<int> neutralIndices, std::vector<int> char
   std::vector<double> buildTrackVector(Track* t);
   std::vector<double> build4vec(TLorentzVector v);
   std::vector<double> buildFitTrackVector(TrackParticleFitObject* tfo);
-
+  std::vector<double> buildLeptonFitVector(LeptonFitObject* lfo);
   void printCombinations(std::vector<std::vector<int> > combs);
+  std::vector<double> buildLeptonVector(TLorentzVector v, double q);
+  std::vector<double> buildNeutralParamVector(TLorentzVector v);
  // FloatVec ConstructCovMatrix(std::vector<std::vector<double> > trackparams, std::vector<TLorentzVector> charged, std::vector<TLorentzVector> neutral, double* cov);
  protected:
 //TTree stuff for fit analysis
@@ -120,15 +121,17 @@ NewtonFitterGSL* setUpFit(std::vector<int> neutralIndices, std::vector<int> char
  std::vector<TLorentzVector> measNeutral;
   std::vector<TLorentzVector> measCharged;
   std::vector<std::vector<double> > measNeutralVec;
+  std::vector<std::vector<double> > measNeutralParamVec;
   std::vector<std::vector<double> > measChargedVec;
   std::vector<Track*> measTrack;
   std::vector<std::vector<double> > measTrackVec;
   std::vector<TLorentzVector> fitNeutral;
   std::vector<TLorentzVector> fitCharged;
-  std::vector<std::vector<double> > fitNeutralVec;
-  std::vector<std::vector<double> > fitChargedVec;
+  std::vector<std::vector<double> > fitNeutralVec;//px py pz e
+  std::vector<std::vector<double> > fitNeutralParamVec;//e theta phi
+  std::vector<std::vector<double> > fitChargedVec;//px py pz e
   std::vector<Track*> fitTrack;
-  std::vector<std::vector<double> > fitTrackVec;
+  std::vector<std::vector<double> > fitTrackVec;//k theta phi
 
   std::vector<std::vector<double> > measNeutral_err;
   std::vector<std::vector<double> > measCharged_err;
@@ -165,14 +168,17 @@ NewtonFitterGSL* setUpFit(std::vector<int> neutralIndices, std::vector<int> char
   std::vector<std::vector<double> > fitgen_ChargedPulls;
 
   TLorentzVector genParent;
-
+//probably should update tlvs to genparentvec for plotting 4vec array
   std::vector<double> genNeutralPdg;
   std::vector<double> genChargedPdg;
 
   std::vector<std::vector<double> > mcTrack;//not implemented yet
   std::vector<TLorentzVector> mcCharged;
   std::vector<TLorentzVector> mcNeutral;
-
+  std::vector<std::vector<double> > mcChargedVec; //4vectors gen
+  std::vector<std::vector<double> > mcChargedParamVec; //local param gen
+  std::vector<std::vector<double> > mcNeutralVec; //4vec
+  std::vector<std::vector<double> > mcNeutralParamVec;// local param gen
 
 
   //vectors for particle input information
@@ -181,7 +187,9 @@ NewtonFitterGSL* setUpFit(std::vector<int> neutralIndices, std::vector<int> char
 	double _parentCharge;
 	int _nDaughters;
 	int _nCharged;
+	int _nChargedParams;
 	int _nNeutral;
+	int _nNeutralParams;
 	std::vector<int> _daughterChargedPdgs;
 	std::vector<int> _daughterNeutralPdgs;
 	std::vector<float> _daughterChargedMass;
@@ -197,10 +205,9 @@ NewtonFitterGSL* setUpFit(std::vector<int> neutralIndices, std::vector<int> char
 
   //LeptonFitObject* part1;
  // LeptonFitObject* part2;
-//  std::vector<LeptonFitObject*> chargedFO; 
-    std::vector<TrackParticleFitObject*> TrackFO;
-// OPALFitterGSL*
-NewtonFitterGSL* fitter;
+   std::vector<LeptonFitObject*> TrackFO; 
+ //   std::vector<TrackParticleFitObject*> TrackFO;
+  OPALFitterGSL* fitter;
 //    BaseFitter* ftest;
 
   std::vector<ReconstructedParticle*>_pfovec;
@@ -213,6 +220,7 @@ NewtonFitterGSL* fitter;
   std::string _outputParticleCollectionName;
   std::string _outputTrackCollectionName;
   double _fitProbabilityCut;
+  double _allowedMassDeviation;
  
   int _ifitter;
   int _fitAnalysis;
