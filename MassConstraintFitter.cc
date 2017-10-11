@@ -175,6 +175,29 @@ MassConstraintFitter::MassConstraintFitter() : marlin::Processor("MassConstraint
 			     _genAnalysis,
 			     (int)1);
 
+//secondary mass constraints
+  registerProcessorParameter("nMassConstraints",
+			     "the number of mass constraints being applied",
+			     _nMassConstraints,
+			     (int)1);
+ 
+  std::vector<float> secondaryMasses;
+  registerProcessorParameter("SecondaryMasses",
+			     "vector of the masses that are not the parent mass ",
+			     _secondaryMasses,
+			     secondaryMasses);
+
+  std::vector<float> secondaryNCharged;
+  registerProcessorParameter("SecondaryNCharged",
+			     "vector of nCharged for each secondary constraint",
+			     _secondaryNCharged,
+			     secondaryNCharged);
+
+  std::vector<float> secondaryNNeutral;
+  registerProcessorParameter("SecondaryNNeutral",
+			     "vector of nNeutral for each secondary constraint",
+			     _secondaryNNeutral,
+			     secondaryNNeutral);
   
   return;
 
@@ -186,10 +209,10 @@ void MassConstraintFitter::init() {
   if(_printing>1)printParameters(); 
 
   evtNo=0;
-
+//  rejects = new TH1D("hrejects","Rejected Events",5,1.0,5.0);
   if(_fitAnalysis)
 	rootFile = new TFile(m_rootFile.c_str(),"RECREATE");
- 
+        rejects = new TH1D("hrejects","Rejected Events",5,0.5,5.5); 
 ////////////////////////////////////////////////////////
 ///fit and measured analysis tree init
 //_fitAnalysis includes the general analysis from the reconstructed particles
@@ -208,6 +231,7 @@ void MassConstraintFitter::init() {
   	tree->Branch("FitProbability", &FitProbability );
 	tree->Branch("Chisq", &Chisq);
 	tree->Branch("evtNo", &evtNo);
+	tree->Branch("rejectNo",&rejectNo);
 
 	tree->Branch("measNeutralVec.", &measNeutralVec);
 	tree->Branch("measNeutralParamVec.",&measNeutralParamVec);
@@ -239,6 +263,8 @@ void MassConstraintFitter::init() {
 
 	tree->Branch("fitmeas_NeutralPulls.",&fitmeas_NeutralPulls);
 	tree->Branch("fitmeas_ChargedPulls.",&fitmeas_ChargedPulls);
+
+	
    }
 	//////////////mc stuff
 	if(_genAnalysis){
@@ -460,7 +486,7 @@ std::vector<double> MassConstraintFitter::getNeutralErrors(TLorentzVector pneutr
 
 	std::vector<double> errors;/// = new double[3];
 	if(pNeutral->getType() == 22){
-	 	errors.push_back(0.16*std::sqrt(pneutral.E()) );
+	 	errors.push_back(0.18*std::sqrt(pneutral.E()) );
 		errors.push_back(0.001/std::sqrt(pneutral.E()) );
 		errors.push_back(0.001/std::sqrt(pneutral.E()) );
 	}
@@ -811,15 +837,75 @@ FloatVec MassConstraintFitter::ConstructCovMatrix(std::vector<std::vector<double
 	     } 
 
 	return covP;
-} 
+}
+int MassConstraintFitter::getIndexOfMatchingIndices(std::vector<int> indices, int index){
+	int matchIndex= -1;
+	for(int i =0; i<indices.size(); i++){
+		if(indices.at(i) == index) matchIndex=i;
+	}
+
+	return matchIndex;	
+}
+//compare to arrays, do any of the contents match?
+bool MassConstraintFitter::vectorIndicesOverlap(std::vector<int> v1, std::vector<int> v2){
+	bool overlap = false;
+	for(int i=0; i<v1.size(); i++){
+		for(int j=0; j<v2.size(); j++){
+			if(v1.at(i) == v2.at(j)) overlap = true;
+		}
+	}
+
+	return overlap;
+}
+//pass in indices and massconstraint vector, check do these containt overlapping subsets of particles?? if they do this combination is invalid, constraints can not share particles
+bool MassConstraintFitter::secondaryConstraintCombinationValid(std::vector<int> indices, std::vector<massconstraint*> constraintVector ){
+		//does this set contain same particles???
+		bool valid= true;
+		std::vector<int> n1,n2;
+		std::vector<int> c1,c2;
+		//compare indices
+		for(int i=0; i<indices.size(); i++){
+			for( int j=i+1; j<indices.size(); j++){
+			//	std::cout<<"constraints "<<indices.at(i)<<" "<<indices.at(j)<<std::endl;
+				//compare indices subsets
+				n1 = constraintVector.at(i)->neutralIndices;
+				n2 = constraintVector.at(j)->neutralIndices;
+				c1 = constraintVector.at(i)->chargedIndices;
+				c2 = constraintVector.at(j)->chargedIndices;
+			/*	for(int i=0; i<n1.size(); i++){
+					std::cout<<n1.at(i)<<" ";
+				}
+				std::cout<<" and ";
+				for(int i=0; i<n2.size(); i++){
+					std::cout<<n2.at(i)<<" ";
+				}	
+			*///	std::cout<<std::endl;
+				if( vectorIndicesOverlap(n1,n2) ) valid = false;
+				if( vectorIndicesOverlap(c1,c2) ) valid = false;	
+			//	if(vectorIndicesOverlap(n1,n2) ) std::cout<<"invalid"<<std::endl;
+			//	else std::cout<<"valid!!"<<std::endl;
+			}
+//			if(!valid) std::cout<<"not valid"<<std::endl;
+//			if(valid) std::Cout<<"valid"<<std::endl;
+		}
+	return valid;
+}
 //===================================================================================
 //Current implementation only allows one type of fitter because using the base class is not working correctly
 //BaseFitter* MassConstraintFitter::setUpFit(TLorentzVector gamma, TLorentzVector p1, TLorentzVector p2, Track* p1Track, Track* p2Track ){
 //OPALFitterGSL* MassConstraintFitter::setUpFit(TLorentzVector gamma, TLorentzVector p1, TLorentzVector p2, Track* p1Track, Track* p2Track){
-OPALFitterGSL*  MassConstraintFitter::setUpFit(std::vector<int> neutralIndices, std::vector<int> chargedIndices,std::vector<TLorentzVector> pneutral, std::vector<TLorentzVector> ptrack,std::vector<ReconstructedParticle*> pNeutralVec, std::vector<Track*> pTrackVec){                                       
+OPALFitterGSL*  MassConstraintFitter::setUpFit(std::vector<int> neutralIndices, std::vector<int> chargedIndices, std::vector<int> massConstraintIndices, std::vector<massconstraint*> constraintVector, std::vector<TLorentzVector> pneutral, std::vector<TLorentzVector> ptrack,std::vector<ReconstructedParticle*> pNeutralVec, std::vector<Track*> pTrackVec){                                       
 
 	//set up mass constraint
 	MassConstraint mc( (double)_parentMass );
+
+	//set up secondary mass constraints
+	std::vector<MassConstraint> secondaryMCs;
+	for(int i =0; i<massConstraintIndices.size(); i++){
+//			std::cout<<"inited a constraint"<<std::endl;
+			MassConstraint secmcs( (double)constraintVector.at(massConstraintIndices.at(i))->mass  );
+			secondaryMCs.push_back(secmcs);
+	}	
 
 	//construct fit objects for gamma, and 2 charged particles
 	std::vector<std::vector<double> > neutralErrors;
@@ -849,7 +935,7 @@ OPALFitterGSL*  MassConstraintFitter::setUpFit(std::vector<int> neutralIndices, 
 		TrackFO.push_back( new LeptonFitObject(pTrackVec.at(chargedIndices.at(i)), B ,ptrack.at(chargedIndices.at(i)).M()  ));
 	} 	
 
-
+	
 /*	if(_printing>4)std::cout <<" Fitting Measured Quantities:" <<std::endl;						
 	
 	if(_printing>4)std::cout <<" Neutral Particles "<<std::endl;
@@ -888,13 +974,14 @@ OPALFitterGSL*  MassConstraintFitter::setUpFit(std::vector<int> neutralIndices, 
 		
 
 	
-	//add fitobjects to mass constraint
+	//add fitobjects to initial mass constraint
 	for(unsigned int i= 0; i<TrackFO.size(); i++){
 		mc.addToFOList(*TrackFO[i]);
 	}
 	for(unsigned int i =0; i<neutralJets.size(); i++){
 		mc.addToFOList(*neutralJets[i]);
 	}
+
 
 //	std::cout<<"add to mc "<<std::endl;
 	//declare fitter
@@ -909,6 +996,38 @@ OPALFitterGSL*  MassConstraintFitter::setUpFit(std::vector<int> neutralIndices, 
 	for(unsigned int i=0; i< neutralJets.size(); i++){
 		fitter->addFitObject( neutralJets[i] );
 	}
+
+	//add FO to secondary mcs
+//	for(int i=0; i< massConstraintIndices.size(); i++){
+//		std::cout<<"massConst ind "<<massConstraintIndices.at(i)<<" ";
+//	}
+//	std::cout<<std::endl;
+	//std::cout<<"neut inds"<<std::endl;
+//	for(int i=0; i< neutralIndices.size(); i++){
+//		std::cout<<neutralIndices.at(i)<<" ";
+//	}
+	std::cout<<std::endl;
+	for(unsigned int i= 0; i<massConstraintIndices.size(); i++){
+		for(unsigned int j=0; j<constraintVector.at(massConstraintIndices.at(i))->chargedIndices.size(); j++){
+				int trackfoindex;
+		//		std::cout<<"here ? c"<<std::endl;
+				trackfoindex = getIndexOfMatchingIndices(chargedIndices, constraintVector.at(massConstraintIndices.at(i))->chargedIndices.at(j));
+				secondaryMCs.at(i).addToFOList(*TrackFO[trackfoindex]);
+						
+		}
+		for(unsigned int j=0; j<constraintVector.at(massConstraintIndices.at(i))->neutralIndices.size(); j++){
+				int neutralfoindex;
+		//		std::cout<<"here ? n"<<std::endl;
+		//		std::cout<<"looking for "<< constraintVector.at(massConstraintIndices.at(i))->neutralIndices.at(j)<<std::endl;
+				neutralfoindex = getIndexOfMatchingIndices(neutralIndices, constraintVector.at(massConstraintIndices.at(i))->neutralIndices.at(j));
+		//		std::cout<<"found at "<<neutralfoindex<<std::endl;
+				secondaryMCs.at(i).addToFOList(*neutralJets[neutralfoindex]);
+		}
+		
+	}
+//	std::cout<<"add secondary mcs?"<<std::endl;
+	//
+	
 //	std::cout<<" add FO "<<std::endl;
 //		fitter->addFitObject( vertexFO );
 
@@ -919,6 +1038,11 @@ OPALFitterGSL*  MassConstraintFitter::setUpFit(std::vector<int> neutralIndices, 
 	//add the things, what order should i use? charged then neutral?
 
 	fitter->addConstraint(mc);
+
+	//add secondary mcs
+	for(int i=0; i<secondaryMCs.size(); i++){
+		fitter->addConstraint(secondaryMCs.at(i) );
+	}
 //	std::cout<<" add const "<<std::endl;	
 	//do the fit (this also returns a fit probability)
 	
@@ -932,7 +1056,23 @@ OPALFitterGSL*  MassConstraintFitter::setUpFit(std::vector<int> neutralIndices, 
 	for(int i=0; i<chargedIndices.size(); i++){
 		std::cout<<chargedIndices.at(i)<<" ";
 	}
-	std::cout<<" ] with fit probability "<<fitp<<std::endl;
+	std::cout<<" ] "<<std::endl;
+	if(massConstraintIndices.size()!=0){
+		std::cout<<"Secondary constraint Combinations with subset and mass"<<std::endl;
+		for(int i=0; i<massConstraintIndices.size(); i++){
+			std::cout<<"secondary constraint "<< i << "[ ";
+			for(int j=0; j<constraintVector.at(massConstraintIndices.at(i))->neutralIndices.size(); j++){
+				std::cout<<constraintVector.at(massConstraintIndices.at(i))->neutralIndices.at(j)<<" ";
+			}
+			std::cout<<" ] [ ";
+			for(int j=0; j<constraintVector.at(massConstraintIndices.at(i))->chargedIndices.size(); j++){
+				std::cout<<constraintVector.at(massConstraintIndices.at(i))->chargedIndices.at(j)<<" ";
+			}
+			std::cout<<" ] "<<constraintVector.at(massConstraintIndices.at(i))->mass<<std::endl;;
+		
+		}
+	}
+	std::cout<<"with fit probability "<<fitp<<std::endl;
 
 	//TODO:: look up the function that returns fit prob, dont fit twice if printing	
 //	if(_printing>4)std::cout <<" Fit Probability: "<< fitter->fit()<<std::endl;
@@ -1031,6 +1171,60 @@ TrackImpl* MassConstraintFitter::constructTrack(TLorentzVector fitp, Track* meas
 
 	return fitt;
 }
+void MassConstraintFitter::printmassconstraints(std::vector<massconstraint*> cv){
+	for(int i=0; i<cv.size(); i++){
+		std::cout<<"Mass "<<cv.at(i)->mass<<" ";
+		std::cout<<"N: [ ";
+		for(int j=0; j<cv.at(i)->neutralIndices.size(); j++){
+			std::cout<<cv.at(i)->neutralIndices.at(j)<<" ";
+		}
+		std::cout<<"]  C: [ ";
+		for(int j=0; j<cv.at(i)->chargedIndices.size(); j++){
+			std::cout<<cv.at(i)->chargedIndices.at(j)<<" ";
+		} 
+		std::cout<<"]"<<std::endl;
+	}
+}
+std::vector<massconstraint*> MassConstraintFitter::buildMassConstraint(std::vector<std::vector<int> > neutralIndices, std::vector<std::vector<int> > chargedIndices, double mass, int nNeutral, int nCharged){
+	//remeber to implement for use casses no neutral or no charged
+	std::vector<massconstraint*> mcs;
+	//first case assume both arrays populated
+	if(nNeutral > 0 && (nCharged > 0)){
+//	std::cout<<"seg here?"<<std::endl;
+		for(int i=0; i<neutralIndices.size(); i++){
+			for(int j=0; j<chargedIndices.size(); j++){
+				massconstraint* c  = new massconstraint;
+				c->neutralIndices=neutralIndices.at(i);
+				c->chargedIndices=chargedIndices.at(j);
+				c->mass=mass;
+				mcs.push_back(c);
+			}		
+		}
+	}
+	//charged only case
+	if(nNeutral == 0){
+		for(int i=0; i<chargedIndices.size(); i++){
+			massconstraint* c= new massconstraint;
+			c->chargedIndices=chargedIndices.at(i);
+			c->mass=mass;
+			mcs.push_back(c);
+		}
+	}
+	//neutral only case
+	if(nCharged == 0){
+//		std::cout<<"should be here"<<std::endl;
+	//	printCombinations(neutralIndices);
+		for(int i=0; i<neutralIndices.size(); i++){
+			massconstraint* c = new massconstraint;
+			c->neutralIndices=neutralIndices.at(i);
+			c->mass=mass;
+			mcs.push_back(c);
+		}
+	}
+//	std::cout<<"made stuff"<<std::endl;
+//	printmassconstraints(mcs);	
+	return mcs;
+}
 std::vector<double> MassConstraintFitter::buildTrackVector(Track* t){
 
 	std::vector<double> tvect;
@@ -1094,6 +1288,20 @@ void MassConstraintFitter::printCombinations(std::vector<std::vector<int> > comb
 		std::cout<<" ] "<<std::endl;
 	}
 }
+/*void MassConstraintFitter::printmassconstraints(std::vector<massconstraint*> cv){
+	for(int i=0; i<cv.size(); i++){
+		std::cout<<"Mass "<<cv.at(i)->mass<<" ";
+		std::cout<<"N: [ ";
+		for(int j=0; j<cv.at(i)->neutralIndices.size(); j++){
+			std::cout<<cv.at(i)->neutralIndices.at(j)<<" ";
+		}
+		std::cout<<"]  C: [ ";
+		for(int j=0; j<cv.at(i)->chargedIndices.size(); j++){
+			std::cout<<cv.at(i)->chargedIndices.at(j)<<" ";
+		} 
+		std::cout<<"]"<<std::endl;
+	}
+}*/
 void MassConstraintFitter::clear(){
 	neutralJets.clear();
                 TrackFO.clear();
@@ -1158,6 +1366,8 @@ void MassConstraintFitter::clear(){
 }
 //===================================================================================
 void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recparcol) {
+
+  rejectNo=0;
 
   if(_printing>1)std::cout << "FindMassConstraintCandidates : (nPFOs = " << _pfovec.size() << " )" << std::endl; 
   if(_printing>1)std::cout << "FindMassConstraintCandidates : evtNo = " << evtNo << std::endl;
@@ -1247,17 +1457,61 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	 generateIndicesCombinations(pneutral.size(), _nNeutral, neutralCandidateIndices);
 	std::vector<std::vector<int> > chargedCandidateIndices; 
 	 generateIndicesCombinations(ptrack.size(), _nCharged, chargedCandidateIndices);
+
+
+
+	std::vector<massconstraint*> constraintVector;
+	std::vector<std::vector<int> > secondaryMassConstraintIndices;
+	//build up secondary mass constraints
+	/////////////////////////	 
+	//loop over mass vector, choose based on params	
+//	std::cout<<"n mass constraints "<<_nMassConstraints<<std::endl;
+	if(_nMassConstraints > 1){
+//	buildmassconstraints(charged indice vector, neutral indice vector, mass)	
+		for(int i =0; i<_secondaryMasses.size(); i++){
+//			std::cout<<"in build constraints"<<std::endl;
+			std::vector<std::vector<int> > secondaryNeutralIndices;
+			std::vector<std::vector<int> > secondaryChargedIndices;
+			generateIndicesCombinations(pneutral.size(), _secondaryNNeutral.at(i), secondaryNeutralIndices);
+			generateIndicesCombinations(ptrack.size(), _secondaryNCharged.at(i), secondaryChargedIndices);
+//			std::cout<<"the combinations inbefore build mc"<<std::endl;
+//			printCombinations(secondaryNeutralIndices);
+//			printCombinations(secondaryChargedIndices);	
+			std::vector<massconstraint*> tempconstraint;
+//			std::cout<<"calling build mc"<<std::endl;
+			tempconstraint = buildMassConstraint(secondaryNeutralIndices,secondaryChargedIndices, _secondaryMasses.at(i), _secondaryNNeutral.at(i), _secondaryNCharged.at(i));
+//			std::cout<<"concating"<<std::endl;
+			constraintVector.insert(constraintVector.end(), tempconstraint.begin(), tempconstraint.end() );
+//			std::cout<<"concat done"<<std::endl;
+			tempconstraint.clear();
+			secondaryNeutralIndices.clear();
+			secondaryChargedIndices.clear();
+
+		}
+//		std::cout<<"size "<<constraintVector.size()<<std::endl;
+		//printmassconstraints(constraintVector);
+//		std::cout<<"size "<<constraintVector.size()<<std::endl;
+//		std::cout<<"now making mc combos"<<std::endl;
+	//now generate all combinations of secondary mass constraints
+	//	std::vector<std::vector<int> > secondaryMassConstraintIndices;
+		generateIndicesCombinations(constraintVector.size(), _nMassConstraints-1, secondaryMassConstraintIndices );	
+	}
+///	std::cout<<"done building"<<std::endl;
 	double fitprob = -1 ;
 //test indices
-	
+	std::cout<<"neutral Indices"<<std::endl;
 	printCombinations(neutralCandidateIndices);
+	std::cout<<"charged Indices"<<std::endl;
 	printCombinations(chargedCandidateIndices);
-
-
+	printmassconstraints(constraintVector);
+	std::cout<<"Secondary MC Indicies"<<std::endl;
+	printCombinations(secondaryMassConstraintIndices);
 
 	std::vector<int> bestCandidatesNeutral;
 	std::vector<int> bestCandidatesCharged;
 	
+	//
+	std::vector<int> bestSecondaryConstraints;
 
 	//iterate and fit all particle combinations, save the best one (highest fit probability)
 	//assume both indice vectors are non zero size
@@ -1273,20 +1527,70 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 			//if charge is consistent with parent, try fitting
 			//TODO check and see if neutral types are consistent?
 			if(chargeSum == _parentCharge){
-				OPALFitterGSL*  fitter = setUpFit(neutralCandidateIndices.at(i), chargedCandidateIndices.at(j), pneutral, ptrack, pNeutralVec, pTrackVec);
-				fitprob = fitter->getProbability();
-			}
+				if(_nMassConstraints > 1){
+				//	std::cout<<"in here nmass"<<std::endl;
+			//		printCombinations(secondaryMassConstraintIndices);
+				//	for(unsigned int l=0; l<_nMassConstraints; l++){
+					for(unsigned int l=0; l< secondaryMassConstraintIndices.size(); l++){
+						for(unsigned int m=0; m< secondaryMassConstraintIndices.at(l).size(); m++){
+						//loop to make sure massconstraint indices ARE A SUBSET of Candidate indices
+						bool isSubset=true;
+							for(unsigned int n=0; n<constraintVector.at(secondaryMassConstraintIndices.at(l).at(m))->chargedIndices.size() ; n++  ){
+								int tempIndex = getIndexOfMatchingIndices(chargedCandidateIndices.at(i), constraintVector.at(secondaryMassConstraintIndices.at(l).at(m))->chargedIndices.at(n));
+//								std::cout<<"temp index c"<<tempIndex<<std::endl;
+								if(tempIndex == -1) isSubset=false;
+							}
+							for(unsigned int n=0; n< constraintVector.at(secondaryMassConstraintIndices.at(l).at(m))->neutralIndices.size(); n++  ){
+								int tempIndex = getIndexOfMatchingIndices(neutralCandidateIndices.at(i)  , constraintVector.at(secondaryMassConstraintIndices.at(l).at(m))->neutralIndices.at(n));
+//								std::cout<<"temp index n"<<tempIndex<<std::endl;
+								if(tempIndex == -1) isSubset=false;
+							}	
+							if(isSubset){// && secondaryConstraintCombinationValid(secondaryMassConstraintIndices.at(l), constraintVector )){
+//								std::cout<<"about to fit"<<std::endl;
+								OPALFitterGSL*  fitter = setUpFit(neutralCandidateIndices.at(i), chargedCandidateIndices.at(j),secondaryMassConstraintIndices.at(l), constraintVector,  pneutral, ptrack, pNeutralVec, pTrackVec);
+								fitprob = fitter->getProbability();
+							}
+							if(fitprobmax == -1){// && (fitprob > _fitProbabilityCut)){
+								fitprobmax = fitprob;
+								bestCandidatesNeutral = neutralCandidateIndices.at(i);
+								bestCandidatesCharged = chargedCandidateIndices.at(j);
+								bestSecondaryConstraints = secondaryMassConstraintIndices.at(l);
+							}
+							if( (fitprob > fitprobmax )){//{ && (fitprob > _fitProbabilityCut)){
+								fitprobmax = fitprob;
+								bestCandidatesNeutral = neutralCandidateIndices.at(i);
+								bestCandidatesCharged = chargedCandidateIndices.at(j);
+								bestSecondaryConstraints = secondaryMassConstraintIndices.at(l);
+							}
+							neutralJets.clear();
+							TrackFO.clear();
+//							std::cout<<"about to del "<<std::endl;
+							delete fitter;
+						}
+					}
+				}
+				else{//there is only 1 constraint
+					std::vector<int> noIndices;
+					OPALFitterGSL*  fitter = setUpFit(neutralCandidateIndices.at(i), chargedCandidateIndices.at(j),noIndices, constraintVector,  pneutral, ptrack, pNeutralVec, pTrackVec);
+					fitprob = fitter->getProbability();
+
+				
+			
 		//	std::cout<<"probs (max,prob,cut) "<< fitprobmax<< " "<<fitprob<<" "<<_fitProbabilityCut<<std::endl;
-			if(fitprobmax == -1){// && (fitprob > _fitProbabilityCut)){
-				fitprobmax = fitprob;
-				bestCandidatesNeutral = neutralCandidateIndices.at(i);
-				bestCandidatesCharged = chargedCandidateIndices.at(j);
-			}
-			if( (fitprob > fitprobmax )){//{ && (fitprob > _fitProbabilityCut)){
-				fitprobmax = fitprob;
-				bestCandidatesNeutral = neutralCandidateIndices.at(i);
-				bestCandidatesCharged = chargedCandidateIndices.at(j);
-			}
+					if(fitprobmax == -1){// && (fitprob > _fitProbabilityCut)){
+						fitprobmax = fitprob;
+						bestCandidatesNeutral = neutralCandidateIndices.at(i);
+						bestCandidatesCharged = chargedCandidateIndices.at(j);
+			
+					}
+					if( (fitprob > fitprobmax )){//{ && (fitprob > _fitProbabilityCut)){
+						fitprobmax = fitprob;
+						bestCandidatesNeutral = neutralCandidateIndices.at(i);
+						bestCandidatesCharged = chargedCandidateIndices.at(j);
+					}
+		
+				}
+			}//end charge consistency check
 			neutralJets.clear();
 			TrackFO.clear();
 //			std::cout<<"about to del "<<std::endl;
@@ -1294,8 +1598,10 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 //			std::cout<<"after del "<<std::endl;
 			chargeSum=0.0;
 		}
+	}//end condiitonal
 	}
-	}
+
+///TODO do n constraints for other USE CASES ///////////////////////////////////////////////////////////////////////////
 	//if there are no neutrals only loop over charged
 	if( neutralCandidateIndices.size() == 0 ){
 		for(unsigned int j=0; j< chargedCandidateIndices.size(); j++){
@@ -1308,20 +1614,59 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 			//if charge is consistent with parent, try fitting
 			//TODO check and see if neutral types are consistent?
 			if(chargeSum == _parentCharge){
-				OPALFitterGSL*  fitter = setUpFit(noIndices, chargedCandidateIndices.at(j), pneutral, ptrack, pNeutralVec, pTrackVec);//neutrals at i? what do here
-				fitprob = fitter->getProbability();
-			}
+				if(_nMassConstraints > 1){
+					//for(unsigned int l=0; l<_nMassConstraints; l++){
+					for(unsigned int l=0; l<secondaryMassConstraintIndices.size(); l++){
+						for(unsigned int m=0; m<secondaryMassConstraintIndices.at(l).size(); m++){
+						bool isSubset=true;
+							for(unsigned int n=0; n<constraintVector.at(secondaryMassConstraintIndices.at(l).at(m))->chargedIndices.size() ; n++  ){
+								int tempIndex = getIndexOfMatchingIndices(chargedCandidateIndices.at(j), constraintVector.at(secondaryMassConstraintIndices.at(l).at(m))->chargedIndices.at(n));
+								if(tempIndex == -1) isSubset=false;
+							}
+						
+							if(isSubset){// && secondaryConstraintCombinationValid(secondaryMassConstraintIndices.at(l), constraintVector )){
+								OPALFitterGSL*  fitter = setUpFit(noIndices, chargedCandidateIndices.at(j),secondaryMassConstraintIndices.at(l), constraintVector,  pneutral, ptrack, pNeutralVec, pTrackVec);
+								fitprob = fitter->getProbability();
+							}
+							if(fitprobmax == -1){// && (fitprob > _fitProbabilityCut)){
+								fitprobmax = fitprob;
+								bestCandidatesNeutral = noIndices;
+								bestCandidatesCharged = chargedCandidateIndices.at(j);
+								bestSecondaryConstraints = secondaryMassConstraintIndices.at(l);
+							}	
+							if( (fitprob > fitprobmax )){//{ && (fitprob > _fitProbabilityCut)){
+								fitprobmax = fitprob;
+								bestCandidatesNeutral = noIndices;
+								bestCandidatesCharged = chargedCandidateIndices.at(j);
+								bestSecondaryConstraints = secondaryMassConstraintIndices.at(l);
+							}
+							neutralJets.clear();
+							TrackFO.clear();
+//							std::cout<<"about to del "<<std::endl;
+							delete fitter;
+						}
+					}
+
+				}
+				else{
+					OPALFitterGSL*  fitter = setUpFit(noIndices, chargedCandidateIndices.at(j),noIndices,constraintVector, pneutral, ptrack, pNeutralVec, pTrackVec);//neutrals at i? what do here
+					fitprob = fitter->getProbability();
+			
 		//	std::cout<<"probs (max,prob,cut) "<< fitprobmax<< " "<<fitprob<<" "<<_fitProbabilityCut<<std::endl;
-			if(fitprobmax == -1){// && (fitprob > _fitProbabilityCut)){
-				fitprobmax = fitprob;
-				bestCandidatesNeutral = noIndices;
-				bestCandidatesCharged = chargedCandidateIndices.at(j);
-			}
-			if( (fitprob > fitprobmax )){//{ && (fitprob > _fitProbabilityCut)){
-				fitprobmax = fitprob;
-				bestCandidatesNeutral = noIndices;
-				bestCandidatesCharged = chargedCandidateIndices.at(j);
-			}
+					if(fitprobmax == -1){// && (fitprob > _fitProbabilityCut)){
+						fitprobmax = fitprob;
+						bestCandidatesNeutral = noIndices;
+						bestCandidatesCharged = chargedCandidateIndices.at(j);
+					}
+					if( (fitprob > fitprobmax )){//{ && (fitprob > _fitProbabilityCut)){
+						fitprobmax = fitprob;
+						bestCandidatesNeutral = noIndices;
+						bestCandidatesCharged = chargedCandidateIndices.at(j);
+					}
+				}		
+
+			}//end charge 
+				
 			neutralJets.clear();
 			TrackFO.clear();
 //			std::cout<<"about to del "<<std::endl;
@@ -1335,22 +1680,58 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 			for(unsigned int j=0; j< neutralCandidateIndices.size(); j++){
 			//if charge is consistent with parent, try fitting
 			//TODO check and see if neutral types are consistent?
-			std::vector<int> noIndices;	
+			std::vector<int> noIndices;
+				if(_nMassConstraints > 1){
+				//	for(unsigned int l=0; l<_nMassConstraints; l++){
+					for(unsigned int l=0; l< secondaryMassConstraintIndices.size(); l++){
+						for(int m=0; m< secondaryMassConstraintIndices.at(l).size(); m++){
+							bool isSubset=true;
+							for(unsigned int n=0; n<constraintVector.at(secondaryMassConstraintIndices.at(l).at(m))->chargedIndices.size() ; n++  ){
+								int tempIndex = getIndexOfMatchingIndices(chargedCandidateIndices.at(j), constraintVector.at(secondaryMassConstraintIndices.at(l).at(m))->chargedIndices.at(n));
+								if(tempIndex == -1) isSubset=false;
+							}
+						
+							if(isSubset){// && secondaryConstraintCombinationValid(secondaryMassConstraintIndices.at(l), constraintVector )){
+								OPALFitterGSL*  fitter = setUpFit(neutralCandidateIndices.at(j), noIndices ,secondaryMassConstraintIndices.at(l), constraintVector,  pneutral, ptrack, pNeutralVec, pTrackVec);
+								fitprob = fitter->getProbability();
+							}
+							if(fitprobmax == -1){// && (fitprob > _fitProbabilityCut)){
+								fitprobmax = fitprob;
+								bestCandidatesNeutral = neutralCandidateIndices.at(j);
+								bestCandidatesCharged = noIndices;
+								bestSecondaryConstraints = secondaryMassConstraintIndices.at(l);
+							}
+							if( (fitprob > fitprobmax )){//{ && (fitprob > _fitProbabilityCut)){
+								fitprobmax = fitprob;
+								bestCandidatesNeutral = neutralCandidateIndices.at(j);
+								bestCandidatesCharged = noIndices;
+								bestSecondaryConstraints = secondaryMassConstraintIndices.at(l);
+							}
+							neutralJets.clear();
+							TrackFO.clear();
+//							std::cout<<"about to del "<<std::endl;
+							delete fitter;
+						}
+					}
+
+				}
+				else{	
 			//if charge tracks 0 parent is guaranteed to be neutral 
-				OPALFitterGSL*  fitter = setUpFit(neutralCandidateIndices.at(j), noIndices, pneutral, ptrack, pNeutralVec, pTrackVec);
-				fitprob = fitter->getProbability();
+					OPALFitterGSL*  fitter = setUpFit(neutralCandidateIndices.at(j), noIndices,noIndices,constraintVector, pneutral, ptrack, pNeutralVec, pTrackVec);
+					fitprob = fitter->getProbability();
 		//	}
 		//	std::cout<<"probs (max,prob,cut) "<< fitprobmax<< " "<<fitprob<<" "<<_fitProbabilityCut<<std::endl;
-			if(fitprobmax == -1){// && (fitprob > _fitProbabilityCut)){
-				fitprobmax = fitprob;
-				bestCandidatesNeutral = neutralCandidateIndices.at(j);
-				bestCandidatesCharged = noIndices;
-			}
-			if( (fitprob > fitprobmax )){//{ && (fitprob > _fitProbabilityCut)){
-				fitprobmax = fitprob;
-				bestCandidatesNeutral = neutralCandidateIndices.at(j);
-				bestCandidatesCharged = noIndices;
-			}
+					if(fitprobmax == -1){// && (fitprob > _fitProbabilityCut)){
+						fitprobmax = fitprob;
+						bestCandidatesNeutral = neutralCandidateIndices.at(j);
+						bestCandidatesCharged = noIndices;
+					}
+					if( (fitprob > fitprobmax )){//{ && (fitprob > _fitProbabilityCut)){
+						fitprobmax = fitprob;
+						bestCandidatesNeutral = neutralCandidateIndices.at(j);
+						bestCandidatesCharged = noIndices;
+					}
+				}
 			neutralJets.clear();
 			TrackFO.clear();
 //			std::cout<<"about to del "<<std::endl;
@@ -1366,12 +1747,21 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	if(bestCandidatesNeutral.size()==0 && bestCandidatesCharged.size()==0){
 		evtNo++;
 		std::cout<<"no particles"<<std::endl; 
+		clear();
+		rejectNo=5;
+		rejects->Fill(rejectNo);
 		return;
 	}  
-
+		OPALFitterGSL* fitter;
+	std::vector<int> noIndices;
+	if(_nMassConstraints > 1){
+		fitter = setUpFit(bestCandidatesNeutral, bestCandidatesCharged, bestSecondaryConstraints, constraintVector, pneutral, ptrack, pNeutralVec, pTrackVec);
+	}
+	else{
 	//now refit with best candidates
-	OPALFitterGSL* fitter = setUpFit(bestCandidatesNeutral, bestCandidatesCharged, pneutral, ptrack, pNeutralVec, pTrackVec);
-		
+		fitter = setUpFit(bestCandidatesNeutral, bestCandidatesCharged,noIndices,constraintVector, pneutral, ptrack, pNeutralVec, pTrackVec);
+	}
+	fitprob = fitter->getProbability();	
 					
 	int cov_dim;//=(_nNeutralParams*_nNeutral + _nChargedParams*_nCharged);
 	double * cov = fitter->getGlobalCovarianceMatrix(cov_dim);  //3*(r+k) === 3*(_nNeutral + _nCharged)
@@ -1383,6 +1773,8 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 		evtNo++;
 		std::cout<<"no cov"<<std::endl;
 		clear();
+		rejectNo=2;
+		rejects->Fill(rejectNo);
 		return;
 	}
 
@@ -1478,6 +1870,8 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
                 evtNo++;
                 std::cout<<"fit prob cut not met"<<std::endl;
                 clear();
+		rejectNo=3;
+		rejects->Fill(rejectNo);
                 return;
         }
 	std::cout<<"mass stuff: "<<fabs(measParent.M()-_parentMass)<<" "<<_allowedMassDeviation<<std::endl;
@@ -1486,6 +1880,8 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 		evtNo++;
 		std::cout<<"Measured mass deviation too big"<<std::endl;
 		clear();
+		rejectNo=4;
+		rejects->Fill(rejectNo);
 		return;	
 
 	}	
@@ -1617,7 +2013,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 		*/
 
 		}
-	std::cout << "at parent fit "<<std::endl;
+//	std::cout << "at parent fit "<<std::endl;
 		//parent info
 		std::cout << "Parent Measured (px,py,pz,E) "<<measParent.Px()<<" "<<measParent.Py()<<" "<<measParent.Pz()<<" "<<measParent.E()<<std::endl;
 		std::cout << "Parent   Fit    (px,py,pz,E) "<<fitParent.Pz()<<" "<<fitParent.Py()<<" "<<fitParent.Pz()<<" "<<fitParent.E()<<std::endl;		
@@ -1755,7 +2151,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 					double number;
 				//	tempvec.push_back
 					number=((measNeutralParamVec.at(i).at(j) - fitNeutralParamVec.at(i).at(j)) / (std::sqrt(measNeutral_err.at(i).at(j)*measNeutral_err.at(i).at(j)- fitNeutral_err.at(i).at(j)*fitNeutral_err.at(i).at(j)) ) );
- 					std::cout<<"fit meas nuet pull "<<number<<std::endl;
+ //					std::cout<<"fit meas nuet pull "<<number<<std::endl;
 					tempvec.push_back(number);
 					}
 		//		 	tempvec.push_back( (measNeutral.at(i).E()-fitNeutral.at(i).E())/ (std::sqrt(measNeutral_err.at(i).at(0)*measNeutral_err.at(i).at(0) - fitNeutral_err.at(i).at(0)*fitNeutral_err.at(i).at(0)) ) );
@@ -1772,7 +2168,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 		//		}
 		//
 //commenting out pulls for now
-	std::cout<<"staring parent pull"<<std::endl;
+//	std::cout<<"staring parent pull"<<std::endl;
 				fitmeas_ParentPulls.push_back(( fitParent.Px() - measParent.Px())/ std::sqrt(measParent_err[0]*measParent_err[0]-fitParent_err[0]*fitParent_err[0])) ;
 				fitmeas_ParentPulls.push_back(( fitParent.Py() - measParent.Py())/ std::sqrt(measParent_err[1]*measParent_err[1]-fitParent_err[1]*fitParent_err[1])) ;
 				fitmeas_ParentPulls.push_back(( fitParent.Pz() - measParent.Pz())/ std::sqrt(measParent_err[2]*measParent_err[2]-fitParent_err[2]*fitParent_err[2])) ;
@@ -1802,7 +2198,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 				std::vector<int> neutralMCPIndices;
 				std::vector<int> chargedMCPIndices;
 				std::vector<double> charges;
-			std::cout<<"test 1"<<std::endl;
+		//	std::cout<<"test 1"<<std::endl;
 				for(int i=0; i<fitCharged.size(); i++){
 					chargedMCPIndices.push_back(getCorrespondingMCParticleIndex(fitCharged.at(i)) );//need signed curvature
 				//Note:: this is quick fixed to depend on local parameterization k theta phi
@@ -1816,7 +2212,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 				for(int i=0; i<fitNeutral.size(); i++){
 					neutralMCPIndices.push_back(getCorrespondingMCParticleIndex(fitNeutral.at(i)) );
 				}
-			std::cout<<"test 2"<<std::endl;
+		//	std::cout<<"test 2"<<std::endl;
 				
 				/*if(mcp1index != -1 && mcp2index != -1 && mcpgindex !=-1){
 					 mcp1.SetPxPyPzE(_mcpartvec[mcp1index]->getMomentum()[0],
@@ -1834,11 +2230,11 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 				*/
 			//build up mcp 4vetors
 				TLorentzVector mcp;
-				std::cout<<"charged mcp indices "<<std::endl;
-				for(int i=0; i<chargedMCPIndices.size(); i++){
-				std::cout<<chargedMCPIndices.at(i);
-				}
-				std::cout<<std::endl;
+		//		std::cout<<"charged mcp indices "<<std::endl;
+		//		for(int i=0; i<chargedMCPIndices.size(); i++){
+		//		std::cout<<chargedMCPIndices.at(i);
+		//		}
+		//		std::cout<<std::endl;
 				for(int i=0; i< chargedMCPIndices.size(); i++){
 					//TLorentzvector mcp;
 					if( chargedMCPIndices.at(i) != -1){
@@ -1854,7 +2250,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 					mcCharged.push_back(mcp);
 
 				}
-			std::cout<<"test 3"<<std::endl;
+		//	std::cout<<"test 3"<<std::endl;
 				for(int i=0; i< neutralMCPIndices.size(); i++){
 				//	TLorentzVector mcp;
 					if( neutralMCPIndices.at(i) != -1){
@@ -1869,7 +2265,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 					mcNeutral.push_back(mcp);
 					
 				}	
-			std::cout<<"test 4"<<std::endl;
+		//	std::cout<<"test 4"<<std::endl;
 
 			//set up generator data structures
 			for(int i=0; i<mcCharged.size(); i++){
@@ -1880,7 +2276,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 				mcNeutralVec.push_back( build4vec(mcNeutral.at(i)));
 				mcNeutralParamVec.push_back( buildNeutralParamVector(mcNeutral.at(i)));
 			}
-			std::cout<<"test 5"<<std::endl;
+		//	std::cout<<"test 5"<<std::endl;
 			//start generator pulls
 				for(int i=0; i<mcNeutralParamVec.size(); i++){	
 					std::vector<double>  tempvec;		
@@ -1888,7 +2284,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 					double number;
 				//	tempvec.push_back
 					number=((measNeutralParamVec.at(i).at(j) - mcNeutralParamVec.at(i).at(j)) / (measNeutral_err.at(i).at(j) ));
- 					std::cout<<"gen meas nuet pull "<<number<<std::endl;
+ 		//			std::cout<<"gen meas nuet pull "<<number<<std::endl;
 					tempvec.push_back(number);
 					}
 		
@@ -1896,7 +2292,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 					measgen_NeutralPulls.push_back(tempvec);
 					tempvec.clear();
 				}
-			std::cout<<"test 6"<<std::endl;
+		//	std::cout<<"test 6"<<std::endl;
 				
 				for(int i=0; i<mcChargedParamVec.size(); i++){	
 					std::vector<double>  tempvec;
@@ -1904,7 +2300,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 					double number;
 				//	tempvec.push_back
 					number=((measTrackVec.at(i).at(j) - mcChargedParamVec.at(i).at(j)) / (measCharged_err.at(i).at(j) ));
- 					std::cout<<"gen meas nuet pull "<<number<<std::endl;
+ 		//			std::cout<<"gen meas nuet pull "<<number<<std::endl;
 					tempvec.push_back(number);
 					}
 		
@@ -1913,7 +2309,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 					tempvec.clear();
 				}
 
-			std::cout<<"test 7"<<std::endl;
+		//	std::cout<<"test 7"<<std::endl;
 				//all MCP pulls are going to be 3 parameters E theta phi
 
 				//measgen charged
@@ -1976,6 +2372,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
      
 	tree->Fill();
 	clear();
+//	std::cout<<"test 8"<<std::endl;
 	//memory management
 //	neutralCandidateIndices.clear();
 //	chargedCandidateIndices.clear();
@@ -2038,9 +2435,15 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 
 	delete fitter;*/
     }//end pvector size check
+   else{
+	clear();
+	rejectNo=1;
+	rejects->Fill(rejectNo);
+	}
 	//track events for each call
+//	std::cout<<" test 9a"<<std::endl;
 	evtNo++;
-	
+// std::cout<<" test 9 "<<std::endl;	
 	return;
 }
 

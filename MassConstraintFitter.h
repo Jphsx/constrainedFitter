@@ -19,6 +19,7 @@ typedef CLHEP::HepLorentzVector LorentzVector ;
 //#include "NewFitterGSL.h"
 #include "NewtonFitterGSL.h"
 #include "MassConstraint.h"
+#include "TH1D.h"
 //#pragma link C++ class std::vector<std::vector<double> >+;
 //#pragma link C++ class vector<vector<double> >+;
 //#pragma link C++ class vector<TLorentzVector>+;
@@ -34,6 +35,11 @@ using namespace lcio ;
  * @author Justin Anguiano, University of Kansas
  * Code follows convention X -> p1+ p2- gamma
  */
+struct massconstraint{
+        std::vector<int> chargedIndices;
+        std::vector<int> neutralIndices;
+        double mass;
+ };
 
 class MassConstraintFitter : public marlin::Processor {
   
@@ -59,6 +65,7 @@ class MassConstraintFitter : public marlin::Processor {
   /** Called after data processing for clean up.
    */
   virtual void end() ;
+
 private:
   bool FindPFOs( LCEvent* evt );
   bool FindTracks( LCEvent* evt );
@@ -67,8 +74,10 @@ private:
 
   int getCorrespondingMCParticleIndex(TLorentzVector rec);
   void FindMassConstraintCandidates( LCCollectionVec* recparcol);
-
-   OPALFitterGSL*  setUpFit(std::vector<int> neutralIndices, std::vector<int> chargedIndices, std::vector<TLorentzVector> pneutral, std::vector<TLorentzVector> ptrack, std::vector<ReconstructedParticle*> pNeutralVec, std::vector<Track*> pTrackVec);
+  int getIndexOfMatchingIndices(std::vector<int> indices, int index);
+ bool vectorIndicesOverlap(std::vector<int> v1, std::vector<int> v2);
+ bool secondaryConstraintCombinationValid(std::vector<int> indices, std::vector<massconstraint*> constraintVector );
+   OPALFitterGSL*  setUpFit(std::vector<int> neutralIndices, std::vector<int> chargedIndices, std::vector<int> massConstraintIndices, std::vector<massconstraint*> constraintVector, std::vector<TLorentzVector> pneutral, std::vector<TLorentzVector> ptrack, std::vector<ReconstructedParticle*> pNeutralVec, std::vector<Track*> pTrackVec);
   std::vector<double> getChargedParticleErrors(TLorentzVector pcharged, Track* ptrk);
   std::vector<double> getNeutralErrors(TLorentzVector pneutral, ReconstructedParticle* pNeutral);
   std::vector<double> getTrackErrors(Track* ptrk);
@@ -89,13 +98,22 @@ private:
 
   TrackImpl* constructTrack(TLorentzVector fitp, Track* meast);
   std::vector<double> buildTrackVector(Track* t);
+  std::vector<massconstraint*> buildMassConstraint(std::vector<std::vector<int> > neutralIndices, std::vector<std::vector<int> > chargedIndices, double mass, int nNeutral, int nCharged);
   std::vector<double> build4vec(TLorentzVector v);
   std::vector<double> buildFitTrackVector(TrackParticleFitObject* tfo);
   std::vector<double> buildLeptonFitVector(LeptonFitObject* lfo);
   void printCombinations(std::vector<std::vector<int> > combs);
+  void printmassconstraints(std::vector<massconstraint*> cv);
   std::vector<double> buildLeptonVector(TLorentzVector v, double q);
   std::vector<double> buildNeutralParamVector(TLorentzVector v);
  // FloatVec ConstructCovMatrix(std::vector<std::vector<double> > trackparams, std::vector<TLorentzVector> charged, std::vector<TLorentzVector> neutral, double* cov);
+ 
+// struct massconstraint{
+  //      std::vector<int> chargedIndices;
+    //    std::vector<int> neutralIndices;
+      //  double mass;
+// };
+
  protected:
 //TTree stuff for fit analysis
   TFile *rootFile;
@@ -116,6 +134,8 @@ private:
   double FitProbability;
   double Chisq; 
   int evtNo;
+  int rejectNo;
+  TH1D* rejects;
 
 //add variables
  std::vector<TLorentzVector> measNeutral;
@@ -195,6 +215,11 @@ private:
 	std::vector<float> _daughterChargedMass;
 	std::vector<float> _daughterNeutralMass;
 
+	//secondary constraint stuff
+	int _nMassConstraints;
+	std::vector<float> _secondaryMasses;
+	std::vector<float> _secondaryNCharged;
+	std::vector<float> _secondaryNNeutral;
 
   //global fitobject pointers
   //return Fit objects in the fitter is not retaining the derived class and chopping to base class
