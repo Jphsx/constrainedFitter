@@ -132,7 +132,8 @@ private:
   double RecoMass;
   double FitEnergy;
   double FitProbability;
-  double Chisq; 
+  double Chisq;
+  double EnergyAsymmetryGen;     // Only makes sense for X -> gamma gamma 
   int evtNo;
   int rejectNo;
   TH1D* rejects;
@@ -140,6 +141,7 @@ private:
 //add variables
  std::vector<TLorentzVector> measNeutral;
   std::vector<TLorentzVector> measCharged;
+  std::vector<std::vector<double> > mcParticleVec;
   std::vector<std::vector<double> > measNeutralVec;
   std::vector<std::vector<double> > measNeutralParamVec;
   std::vector<std::vector<double> > measChargedVec;
@@ -250,6 +252,9 @@ private:
   int _ifitter;
   int _fitAnalysis;
   int _genAnalysis;
+
+  double _photonAngularError;
+  int _photonAngularErrorModel;
  
   std::string m_rootFile;
 

@@ -51,6 +51,16 @@ MassConstraintFitter::MassConstraintFitter() : marlin::Processor("MassConstraint
 			     "PDG code of parent particle",
 			     _parentPdg,
 			     (int) 221);
+
+  registerProcessorParameter("PhotonAngularError",
+			     "Photon Angular Error (rad)",
+			     _photonAngularError,
+			     (double) 0.001);
+
+  registerProcessorParameter("PhotonAngularErrorModel",
+			     "Photon Angular Error Model (0 - stochastic) (1 - constant)",
+			     _photonAngularErrorModel,
+			     (int) 1);
   
   registerProcessorParameter("parentMass",
 			     "Parent particle mass [GeV]",
@@ -230,8 +240,11 @@ void MassConstraintFitter::init() {
         tree->Branch("RecoMass", &RecoMass);
   	tree->Branch("FitProbability", &FitProbability );
 	tree->Branch("Chisq", &Chisq);
+	tree->Branch("EnergyAsymmetryGen", &EnergyAsymmetryGen);
 	tree->Branch("evtNo", &evtNo);
 	tree->Branch("rejectNo",&rejectNo);
+
+        tree->Branch("mcParticleVec.", &mcParticleVec);
 
 	tree->Branch("measNeutralVec.", &measNeutralVec);
 	tree->Branch("measNeutralParamVec.",&measNeutralParamVec);
@@ -401,10 +414,14 @@ bool MassConstraintFitter::FindTracks( LCEvent* evt ) {
 }
 //===================================================================================  
 bool MassConstraintFitter::FindMCParticles( LCEvent* evt ){
-	  bool tf = false;
+   
+  bool tf = false;
 
   // clear old vector
   _mcpartvec.clear();
+
+  std::vector<double> PhotonEnergies;
+
   typedef const std::vector<std::string> StringVec ;
   StringVec* strVec = evt->getCollectionNames() ;
   for(StringVec::const_iterator name=strVec->begin(); name!=strVec->end(); name++){    
@@ -415,10 +432,27 @@ bool MassConstraintFitter::FindMCParticles( LCEvent* evt ){
       for(unsigned int i=0;i<nelem;i++){
 	MCParticle* mcPart = dynamic_cast<MCParticle*>(col->getElementAt(i));
 	_mcpartvec.push_back(mcPart);
+ // Add all filtered mcp's to tree - independent of matching
+        TLorentzVector mcp;
+        mcp.SetPxPyPzE( mcPart->getMomentum()[0], mcPart->getMomentum()[1], mcPart->getMomentum()[2], mcPart->getEnergy() );
+        mcParticleVec.push_back(build4vec(mcp));
+        if(mcPart->getPDG() == 22) PhotonEnergies.push_back(mcPart->getEnergy());
       }
     }
   }
 
+// Calculate variable that is close to costh*.    (actually asymmetry = beta x costh* )
+  EnergyAsymmetryGen = -2.0;
+
+// Only set if there are two only two photons
+  if(PhotonEnergies.size() == 2){
+     double e1 = PhotonEnergies[0];
+     double e2 = PhotonEnergies[1];
+     EnergyAsymmetryGen = fabs(e1-e2)/(e1+e2);
+  }
+
+  PhotonEnergies.clear();
+ 
   if(_printing>1)std::cout << "Find MCParticles : " << tf << std::endl; 
 
   return tf;
@@ -487,8 +521,14 @@ std::vector<double> MassConstraintFitter::getNeutralErrors(TLorentzVector pneutr
 	std::vector<double> errors;/// = new double[3];
 	if(pNeutral->getType() == 22){
 	 	errors.push_back(0.18*std::sqrt(pneutral.E()) );
-		errors.push_back(0.001/std::sqrt(pneutral.E()) );
-		errors.push_back(0.001/std::sqrt(pneutral.E()) );
+                if(_photonAngularErrorModel == 1){
+        	   errors.push_back( _photonAngularError );
+		   errors.push_back( _photonAngularError );
+                }
+                else{
+        	   errors.push_back( _photonAngularError/std::sqrt(pneutral.E()) );
+		   errors.push_back( _photonAngularError/std::sqrt(pneutral.E()) );
+                }
 	}
 	else{
 		errors.push_back(0.55*std::sqrt(pneutral.E()) );
@@ -1311,6 +1351,8 @@ void MassConstraintFitter::clear(){
   //      pNeutralVec.clear();
  //       pTrackVec.clear();
 
+        mcParticleVec.clear();
+
         measNeutral.clear();
         measCharged.clear();
         measTrack.clear();
@@ -1360,6 +1402,8 @@ void MassConstraintFitter::clear(){
        mcNeutralParamVec.clear();
        mcChargedVec.clear();
        mcChargedParamVec.clear();
+
+
 
         delete fitter;
 		
@@ -1454,10 +1498,13 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	double fitprobmax = -1;
 	//double candidate_ijk[3] = {-1,-1,-1};
        std::vector<std::vector<int> > neutralCandidateIndices;
+	if(_nNeutral >0){
 	 generateIndicesCombinations(pneutral.size(), _nNeutral, neutralCandidateIndices);
+	}
 	std::vector<std::vector<int> > chargedCandidateIndices; 
+	if(_nCharged >0){
 	 generateIndicesCombinations(ptrack.size(), _nCharged, chargedCandidateIndices);
-
+	}
 
 
 	std::vector<massconstraint*> constraintVector;
@@ -1517,6 +1564,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	//assume both indice vectors are non zero size
 	double chargeSum= 0.0;
 	if( neutralCandidateIndices.size() !=0 && chargedCandidateIndices.size() !=0){
+
 	for(unsigned int i=0; i< neutralCandidateIndices.size(); i++){
 		for(unsigned int j=0; j< chargedCandidateIndices.size(); j++){
 			//iterate over charged particles and find total charge
@@ -1606,6 +1654,7 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 	if( neutralCandidateIndices.size() == 0 ){
 		for(unsigned int j=0; j< chargedCandidateIndices.size(); j++){
 			//iterate over charged particles and find total charge
+			
 			for( unsigned int k=0; k<chargedCandidateIndices.at(j).size(); k++){
 				 (pTrackVec[chargedCandidateIndices.at(j).at(k)]->getOmega() < 0 ) ? chargeSum+=-1.0 : chargeSum+=1.0 ;
 			}
@@ -1619,11 +1668,12 @@ void MassConstraintFitter::FindMassConstraintCandidates(LCCollectionVec * recpar
 					for(unsigned int l=0; l<secondaryMassConstraintIndices.size(); l++){
 						for(unsigned int m=0; m<secondaryMassConstraintIndices.at(l).size(); m++){
 						bool isSubset=true;
+					
 							for(unsigned int n=0; n<constraintVector.at(secondaryMassConstraintIndices.at(l).at(m))->chargedIndices.size() ; n++  ){
 								int tempIndex = getIndexOfMatchingIndices(chargedCandidateIndices.at(j), constraintVector.at(secondaryMassConstraintIndices.at(l).at(m))->chargedIndices.at(n));
 								if(tempIndex == -1) isSubset=false;
 							}
-						
+						//testing if subset has bugs!!! on B+ decay
 							if(isSubset){// && secondaryConstraintCombinationValid(secondaryMassConstraintIndices.at(l), constraintVector )){
 								OPALFitterGSL*  fitter = setUpFit(noIndices, chargedCandidateIndices.at(j),secondaryMassConstraintIndices.at(l), constraintVector,  pneutral, ptrack, pNeutralVec, pTrackVec);
 								fitprob = fitter->getProbability();
